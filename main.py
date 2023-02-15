@@ -10,24 +10,23 @@ import os
 import sys
 
 
-cur_dir = os.path.dirname(os.path.realpath(__file__))
+cur_dir = os.path.realpath(".")
 pkg_rootdir = cur_dir  # os.path.dirname()向上一级，注意要对应工程root路径
 if pkg_rootdir not in sys.path:
     sys.path.append(pkg_rootdir)
     print('-- Add root directory "{}" to system path.'.format(pkg_rootdir))
 
 
-import socket
 import pandas as pd
 
 from script.crawling_OSDB_list import crawling_OSDB_list_soup
-from script.crawling_OSDB_infos import crawling_OSDB_infos_soup
-
+from script.crawling_OSDB_infos import crawling_OSDB_infos_soup, pd_select_col
 
 UPDATE_OSDB_LIST = False  # This will take a long time to crawl the dbdb.io website if set to True...
-UPDATE_OSDB_INFO = True  # This will take a long long time to crawl many dbdb.io websites if set to True......
+UPDATE_OSDB_INFO = False  # This will take a long long time to crawl many dbdb.io websites if set to True......
+RECALC_OSDB_LIST = True  # Add "Name" column
+RECALC_OSDB_INFO = True  # Check "Name" column; Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
 JOIN_OSDB_SUMMARY_INFO_ON_CARD_TITLE = False  # join OSDB summary and OSDB_infos on filed 'card_title' and 'card_title'
-RECALC_OSDB_INFO = False
 INCREMENTAL = False
 
 month_yyyyMM = "202301"
@@ -81,9 +80,9 @@ if __name__ == '__main__':
         crawling_OSDB_list_soup(url_init, headers[0], use_elem_dict, save_path=OSDB_crawling_path, url_root=dbdbio_url)
 
     if UPDATE_OSDB_INFO:
-        df_ranking_table = pd.read_csv(OSDB_crawling_path, encoding=encoding, index_col=False)
+        df_OSDB_table = pd.read_csv(OSDB_crawling_path, encoding=encoding, index_col=False)
         # dbdbio_insitelink
-        df_db_names_urls = df_ranking_table[['card_title', 'card_title_href']]
+        df_db_names_urls = df_OSDB_table[['card_title', 'card_title_href']]
         df_db_names_urls.columns = ['db_names', 'urls']
 
         use_elem_dict = {
@@ -93,11 +92,14 @@ if __name__ == '__main__':
         batch = 20
         temp_save_path = OSDB_info_crawling_path.rstrip('.csv') + '_temp.csv'
         state = -1
-        while state == -1:
-            try:
-                state = crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path=OSDB_info_crawling_path, mode=mode, temp_save_path=temp_save_path, batch=batch)
-            except socket.timeout:
-                continue
+        crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path=OSDB_info_crawling_path, mode=mode,
+                                 temp_save_path=temp_save_path, batch=batch)
+
+        use_cols = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
+                    "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year", "End Year",
+                    "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses",
+                    "Operating Systems"]
+        pd_select_col(use_cols, temp_save_path, OSDB_info_crawling_path)
 
     if JOIN_OSDB_SUMMARY_INFO_ON_CARD_TITLE:
         pass  # TODO
