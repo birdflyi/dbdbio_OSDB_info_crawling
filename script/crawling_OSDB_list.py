@@ -78,6 +78,21 @@ def crawling_OSDB_list_soup(url_init, header, use_elem_dict, save_path, **kwargs
     return None
 
 
+def recalc_OSDB_list(path, encoding="utf-8", index_col=False):
+    df_OSDB_table = pd.read_csv(path, encoding=encoding, index_col=index_col)
+    get_name_from_url = lambda x: str(x).split("/")[-1]
+    recalc_func_dict = {
+        "Name": {"apply_func": get_name_from_url, "input_col": "card_title_href"},
+    }
+    for recalc_k, recalc_v in recalc_func_dict.items():
+        df_OSDB_table[recalc_k] = df_OSDB_table[recalc_v["input_col"]].apply(recalc_v["apply_func"])
+    # 4. save to csv
+    save_path = path
+    df_OSDB_table.to_csv(save_path, encoding='utf-8', index=False)
+    print(save_path, 'recalculated!')
+    return None
+
+
 if __name__ == '__main__':
     # dbdb.io http link
     dbdbio_url = "https://dbdb.io"
@@ -91,5 +106,7 @@ if __name__ == '__main__':
     use_elem_dict = {
         'main_contents': ['form', {'id': 'mainsearch'}],
     }
-    OSDB_crawling_path = os.path.join(pkg_rootdir, 'data/dbdbio_OSDB_list/OSDB_crawling_202301.csv')
-    crawling_OSDB_list_soup(url_init, header, use_elem_dict, OSDB_crawling_path, url_root=dbdbio_url)
+    OSDB_crawling_path = os.path.join(pkg_rootdir, 'data/dbdbio_OSDB_list/OSDB_crawling_202301_raw.csv')
+    # crawling_OSDB_list_soup(url_init, header, use_elem_dict, OSDB_crawling_path, url_root=dbdbio_url)
+
+    recalc_OSDB_list(path=OSDB_crawling_path)

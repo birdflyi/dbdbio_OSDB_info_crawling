@@ -1,0 +1,14 @@
+category_label,category_name
+Document,Document / XML
+Graph,Entity-Relationship
+Graph,Graph
+Key-value,Key/Value
+Multivalue,Multi-Value
+Object oriented,Object-Oriented
+RDF,Triplestore (RDF)
+Relational,Relational
+Wide column,Column Family
+"Object oriented,Relational",Object-Relational
+Array,Array / Matrix
+Network,Network
+Hierarchical,Hierarchical

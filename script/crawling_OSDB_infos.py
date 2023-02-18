@@ -4,14 +4,19 @@
 
 # @Time   : 2023/1/22 1:13
 # @Author : 'Lou Zehua'
-# @File   : crawling_OSDB_infos.py 
-
+# @File   : crawling_OSDB_infos.py
 import os
 import sys
 
-cur_dir = os.path.realpath(".")
+if '__file__' not in globals():
+    # !pip install ipynbname  # Remove comment symbols to solve the ModuleNotFoundError
+    import ipynbname
+
+    nb_path = ipynbname.path()
+    __file__ = str(nb_path)
+cur_dir = os.path.dirname(__file__)
 pkg_rootdir = os.path.dirname(cur_dir)  # os.path.dirname()向上一级，注意要对应工程root路径
-if pkg_rootdir not in sys.path:
+if pkg_rootdir not in sys.path:  # 解决ipynb引用上层路径中的模块时的ModuleNotFoundError问题
     sys.path.append(pkg_rootdir)
     print('Add root directory "{}" to system path.'.format(pkg_rootdir))
 
@@ -232,6 +237,98 @@ def pd_select_col(cols, src_path, tar_path, encoding="utf-8", index_col=False, *
     return
 
 
+def validate_label_mapping_table(str_series, k_v_colnames=None, mapping_table_path=None, encoding="utf-8", index_col=False):
+    elem_splited_notna = [[e.strip() for e in s.split(',')] for s in pd.Series(str_series).dropna()]
+    elem_splited_flatten = sum(elem_splited_notna, [])  # use sum as the iterate tool
+    elem_set_sorted = list(set(elem_splited_flatten))
+    mapping_table_path = mapping_table_path or os.path.join(pkg_rootdir, f'data/existing_tagging_info/category_labels_mapping_table.csv')
+    df_category_labels_mapping_table = pd.read_csv(mapping_table_path, encoding=encoding, index_col=index_col)
+    k_v_colnames = k_v_colnames or ["category_label", "category_name"]
+    category_name_col = df_category_labels_mapping_table[k_v_colnames[1]]
+    # validate
+    for e in elem_set_sorted:
+        if not e in list(category_name_col):
+            raise KeyError(f"The key {e} must be in category_name_col: \n{category_name_col} ")
+    raw_df_k_v_cols = df_category_labels_mapping_table[k_v_colnames]
+
+    def merge2dict_df_k_v_cols(df, k_colname, v_colname):
+        temp_dict = {}
+        for i in range(len(df)):
+            k = df.loc[i, k_colname]
+            v = df.loc[i, v_colname]
+            if temp_dict.get(k, None) is not None:
+                temp_elem_list = temp_dict[k].split(',')
+                temp_elem_list.append(v)
+                temp_dict[k] = ','.join(temp_elem_list)
+            else:
+                temp_dict[k] = v
+        return temp_dict
+
+    dict_k_category_labels__v_category_names = merge2dict_df_k_v_cols(raw_df_k_v_cols, k_v_colnames[0], k_v_colnames[1])
+    dict_k_category_names__v_category_labels = merge2dict_df_k_v_cols(raw_df_k_v_cols, k_v_colnames[1], k_v_colnames[0])
+    mapping_dicts = {
+        "raw_df_k_v_cols": raw_df_k_v_cols,
+        "label_dict": dict_k_category_labels__v_category_names,
+        "mapping_dict": dict_k_category_names__v_category_labels,
+    }
+    return mapping_dicts
+
+
+def mapping_values2labels(item, **kwargs):
+    mapping_dict = kwargs.get("mapping_dict")
+    if not mapping_dict:
+        raise KeyError("Key 'mapping_dict' can not be found!")
+    if pd.isna(item):
+        return item
+    else:
+        temp_item_list = [mapping_dict[e.strip()] for e in item.split(',')]  # e.g. "Object-Relational, Network"
+        flatten_item_list = []
+        for elem in temp_item_list:
+            elem_list = elem.split(',')  # "Object oriented,Relational",Object-Relational: the key may be multi-types.
+            flatten_item_list.append(elem_list)
+        flatten_item_list = sum(flatten_item_list, [])
+        flatten_item_list = list(set(flatten_item_list))
+        return ",".join(flatten_item_list)
+
+
+def recalc_OSDB_info(path, encoding="utf-8", index_col=False):
+    df_dbms_infos = pd.read_csv(path, encoding=encoding, index_col=index_col)
+    check_not_empty = lambda x: x.any()
+    check_distinct = lambda x: check_not_empty(x) and len(x) == len(set(x))
+    is_from_github = lambda x: False if pd.isna(x) else str(x).startswith("https://github.com/")
+    to_int_str = lambda x: "" if pd.isna(x) else str(int(x))
+    # def abstract_label_mapping_table(strs):
+    #     return list(set(strs))
+    # def mapping_values2labels(strs):
+    #     set(strs)
+    recalc_func_dict = {
+        "Name": {"validate_func": check_distinct},
+        # Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
+        "Data_Model_mapping": {"apply_param_preprocess_func": validate_label_mapping_table, "apply_func": mapping_values2labels, "input_col": "Data Model"},
+        "This_Source_Code_record_from_github": {"apply_func": is_from_github, "input_col": "Source Code"},
+        "Start Year": {"apply_func": to_int_str},
+        "End Year": {"apply_func": to_int_str},
+    }
+    for recalc_k, recalc_v in recalc_func_dict.items():
+        input_col = recalc_v.get("input_col", recalc_k)
+        kwargs = {}
+        try:
+            if recalc_v.get("validate_func"):
+                if not recalc_v["validate_func"](df_dbms_infos[input_col]):
+                    raise Warning(f"Column {recalc_k} can not pass the validation settings in {recalc_k}: {recalc_v}!")
+            if recalc_v.get("apply_param_preprocess_func"):
+                kwargs = recalc_v["apply_param_preprocess_func"](df_dbms_infos[input_col])
+            if recalc_v.get("apply_func"):
+                df_dbms_infos[recalc_k] = df_dbms_infos[input_col].apply(recalc_v["apply_func"], **kwargs)
+        except (TypeError, KeyError, ValueError) as e:
+            raise ValueError(f"Bad settings in {recalc_k}: {recalc_v}!\nError message: {e}")
+    # 4. save to csv
+    save_path = path
+    df_dbms_infos.to_csv(save_path, encoding='utf-8', index=False)
+    print(save_path, 'recalculated!')
+    return None
+
+
 if __name__ == '__main__':
     month_yyyyMM = "202301"
     OSDB_crawling_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_crawling_{month_yyyyMM}_raw.csv')
@@ -267,10 +364,11 @@ if __name__ == '__main__':
     batch = 20
     temp_save_path = OSDB_info_crawling_path.rstrip('.csv') + '_temp.csv'
     state = -1
-    crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path=OSDB_info_crawling_path, mode=mode,
-                             temp_save_path=temp_save_path, batch=batch)
-    use_cols = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
-                        "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year", "End Year",
-                        "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Operating Systems",
-                        "Licenses", "Operating Systems"]
-    pd_select_col(use_cols, temp_save_path, OSDB_info_crawling_path)
+    # crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path=OSDB_info_crawling_path, mode=mode,
+    #                          temp_save_path=temp_save_path, batch=batch)
+    # use_cols = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
+    #             "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year", "End Year",
+    #             "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses", "Operating Systems"]
+    # pd_select_col(use_cols, temp_save_path, OSDB_info_crawling_path)
+
+    recalc_OSDB_info(path=OSDB_info_crawling_path)

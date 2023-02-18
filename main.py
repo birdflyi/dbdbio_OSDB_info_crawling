@@ -10,17 +10,23 @@ import os
 import sys
 
 
-cur_dir = os.path.realpath(".")
+if '__file__' not in globals():
+    # !pip install ipynbname  # Remove comment symbols to solve the ModuleNotFoundError
+    import ipynbname
+
+    nb_path = ipynbname.path()
+    __file__ = str(nb_path)
+cur_dir = os.path.dirname(__file__)
 pkg_rootdir = cur_dir  # os.path.dirname()向上一级，注意要对应工程root路径
-if pkg_rootdir not in sys.path:
+if pkg_rootdir not in sys.path:  # 解决ipynb引用上层路径中的模块时的ModuleNotFoundError问题
     sys.path.append(pkg_rootdir)
     print('-- Add root directory "{}" to system path.'.format(pkg_rootdir))
 
 
 import pandas as pd
 
-from script.crawling_OSDB_list import crawling_OSDB_list_soup
-from script.crawling_OSDB_infos import crawling_OSDB_infos_soup, pd_select_col
+from script.crawling_OSDB_list import crawling_OSDB_list_soup, recalc_OSDB_list
+from script.crawling_OSDB_infos import crawling_OSDB_infos_soup, pd_select_col, recalc_OSDB_info
 
 UPDATE_OSDB_LIST = False  # This will take a long time to crawl the dbdb.io website if set to True...
 UPDATE_OSDB_INFO = False  # This will take a long long time to crawl many dbdb.io websites if set to True......
@@ -78,6 +84,8 @@ if __name__ == '__main__':
             'main_contents': ['form', {'id': 'mainsearch'}],
         }
         crawling_OSDB_list_soup(url_init, headers[0], use_elem_dict, save_path=OSDB_crawling_path, url_root=dbdbio_url)
+    if RECALC_OSDB_LIST:
+        recalc_OSDB_list(path=OSDB_crawling_path)
 
     if UPDATE_OSDB_INFO:
         df_OSDB_table = pd.read_csv(OSDB_crawling_path, encoding=encoding, index_col=False)
@@ -100,6 +108,9 @@ if __name__ == '__main__':
                     "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses",
                     "Operating Systems"]
         pd_select_col(use_cols, temp_save_path, OSDB_info_crawling_path)
+
+    if RECALC_OSDB_INFO:
+        recalc_OSDB_info(path=OSDB_info_crawling_path)
 
     if JOIN_OSDB_SUMMARY_INFO_ON_CARD_TITLE:
         pass  # TODO
