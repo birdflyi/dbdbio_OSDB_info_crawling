@@ -3,13 +3,18 @@ Crawling Open Source DataBases from [dbdb.io](https://www.dbdb.io).
 
 # 1. Crawling OSDB list
 Crawling the Open Source DBMS list from [dbdb.io/browse?type=open-source](https://www.dbdb.io/browse?type=open-source) with the beautifulsoup package.
-save as [OSDB_crawling_202301_raw.csv](./data/dbdbio_OSDB_list/OSDB_crawling_202301_raw.csv)
+
+Save as [OSDB_crawling_202301_raw.csv](./data/dbdbio_OSDB_list/OSDB_crawling_202301_raw.csv)
 
 # 2. recalc OSDB list
 The table of OSDB list csv have columns ["card_title", "card_title_href", "card_img_href", "card_text"]. 
 "card_title" is almost the DBMS name we want, however, some DBMS has the same card_title values: 
-e.g. Consus from https://dbdb.io/db/consus and Consus from https://dbdb.io/db/consus-java. So the Key column should be re-calculated to distinct data format.
-So we add a new column "Name" to store the recalculated DBMS name by the "card_title_href" column, which has unique values.
+e.g.
+- DBMS "Consus" from "https://dbdb.io/db/consus" and DBMS "Consus" from "https://dbdb.io/db/consus-java" have the same "card_title" value. 
+
+So the Key column should be re-calculated to distinct data format.
+We add a new column "Name" to store the recalculated DBMS name by the "card_title_href" column, which has unique values.
+
 Finally, we override the old OSDB list csv in place.
 
 # 3. Crawling OSDB information
@@ -17,14 +22,16 @@ Crawling the Open Source DBMS information from the OSDB card_title_href of OSDB 
 
 # 4. recalc OSDB information
 Some fields should be re-calculated as other data formats. 
-e.g. Check the "Name" column, if not found, recalculated DBMS name by the "card_title_href" column; 
-Mapping the "Data Model" column to [DB-Engines](https://db-engines.com/en/ranking) with [DB-Engines DBMS categories labels mapping table](https://github.com/birdflyi/db_engines_ranking_table_crawling/blob/main/data/existing_tagging_info/category_labels.csv), 
+e.g. 
+- Check the "Name" column, if not found, recalculated DBMS name by the "card_title_href" column; 
+- Mapping the "Data Model" column to [DB-Engines](https://db-engines.com/en/ranking) with [DB-Engines DBMS categories labels mapping table](https://github.com/birdflyi/db_engines_ranking_table_crawling/blob/main/data/existing_tagging_info/category_labels.csv), 
 and get a new [dbdbio DBMS category labels mapping table](./data/existing_tagging_info/category_labels_mapping_table.csv); 
-Check whether Source_Code_record_from_github by "Source Code" column; 
-Convert type from float to str(int) for "Start Year" and "End Year" columns.
+- Check whether Source_Code_record_from_github by "Source Code" column; 
+- Convert type from float to str(int) for "Start Year" and "End Year" columns.
 
 # 5. join OSDB list and OSDB information
 Join OSDB list and OSDB information on the column "Name", and set the key name alias to 'DBMS' after joined.
+
 Set use_cols_OSDB_list = None to use all fields of OSDB list, and set
 use_cols_OSDB_info = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
                       "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year", "End Year",
