@@ -27,13 +27,13 @@ import pandas as pd
 
 from script.crawling_OSDB_list import crawling_OSDB_list_soup, recalc_OSDB_list
 from script.crawling_OSDB_infos import crawling_OSDB_infos_soup, pd_select_col, recalc_OSDB_info
+from script.join_OSDB_list_OSDB_info import join_OSDB_list_OSDB_info
 
 UPDATE_OSDB_LIST = False  # This will take a long time to crawl the dbdb.io website if set to True...
 UPDATE_OSDB_INFO = False  # This will take a long long time to crawl many dbdb.io websites if set to True......
-RECALC_OSDB_LIST = True  # Add "Name" column
-RECALC_OSDB_INFO = True  # Check "Name" column; Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
-JOIN_OSDB_SUMMARY_INFO_ON_CARD_TITLE = False  # join OSDB summary and OSDB_infos on filed 'card_title' and 'card_title'
-INCREMENTAL = False
+RECALC_OSDB_LIST = False  # Add "Name" column
+RECALC_OSDB_INFO = False  # Check "Name" column; Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
+JOIN_OSDB_SUMMARY_INFO_ON_NAME = True  # join OSDB summary and OSDB_infos on filed 'Name' and 'Name'
 
 month_yyyyMM = "202301"
 
@@ -112,5 +112,14 @@ if __name__ == '__main__':
     if RECALC_OSDB_INFO:
         recalc_OSDB_info(path=OSDB_info_crawling_path)
 
-    if JOIN_OSDB_SUMMARY_INFO_ON_CARD_TITLE:
-        pass  # TODO
+    if JOIN_OSDB_SUMMARY_INFO_ON_NAME:
+        use_cols_OSDB_list = None
+        use_cols_OSDB_info = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
+                              "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year", "End Year",
+                              "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses",
+                              "Operating Systems"]
+        df_OSDB_list = pd.read_csv(OSDB_crawling_path, encoding=encoding, index_col=False)
+        df_OSDB_infos = pd.read_csv(OSDB_info_crawling_path, encoding=encoding, index_col=False)
+        join_OSDB_list_OSDB_info(df_OSDB_list, df_OSDB_infos, use_cols_OSDB_list, use_cols_OSDB_info,
+                                 save_path=OSDB_info_joined_path, on_pair=("Name", "Name"), key_alias="DBMS",
+                                 encoding=encoding)
