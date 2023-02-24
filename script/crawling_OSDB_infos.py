@@ -247,7 +247,7 @@ def validate_label_mapping_table(str_series, k_v_colnames=None, mapping_table_pa
     category_name_col = df_category_labels_mapping_table[k_v_colnames[1]]
     # validate
     for e in elem_set_sorted:
-        if not e in list(category_name_col):
+        if e not in list(category_name_col):
             raise KeyError(f"The key {e} must be in category_name_col: \n{category_name_col} ")
     raw_df_k_v_cols = df_category_labels_mapping_table[k_v_colnames]
 
@@ -287,8 +287,9 @@ def mapping_values2labels(item, **kwargs):
             elem_list = elem.split(',')  # "Object oriented,Relational",Object-Relational: the key may be multi-types.
             flatten_item_list.append(elem_list)
         flatten_item_list = sum(flatten_item_list, [])
-        flatten_item_list = list(set(flatten_item_list))
-        return ",".join(flatten_item_list)
+        flatten_item_list_dedup = list(set(flatten_item_list))
+        flatten_item_list_dedup.sort(key=flatten_item_list.index)  # recover the order by the first hit index
+        return ",".join(flatten_item_list_dedup)
 
 
 def recalc_OSDB_info(path, encoding="utf-8", index_col=False):
@@ -305,7 +306,7 @@ def recalc_OSDB_info(path, encoding="utf-8", index_col=False):
         "Name": {"validate_func": check_distinct},
         # Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
         "Data_Model_mapping": {"apply_param_preprocess_func": validate_label_mapping_table, "apply_func": mapping_values2labels, "input_col": "Data Model"},
-        "This_Source_Code_record_from_github": {"apply_func": is_from_github, "input_col": "Source Code"},
+        "Source_Code_record_from_github": {"apply_func": is_from_github, "input_col": "Source Code"},
         "Start Year": {"apply_func": to_int_str},
         "End Year": {"apply_func": to_int_str},
     }

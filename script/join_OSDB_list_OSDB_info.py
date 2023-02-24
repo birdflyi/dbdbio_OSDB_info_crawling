@@ -24,7 +24,8 @@ if pkg_rootdir not in sys.path:  # 解决ipynb引用上层路径中的模块时�
 import pandas as pd
 
 
-def join_OSDB_list_OSDB_info(df_OSDB_list, df_OSDB_infos, use_cols_OSDB_list, use_cols_OSDB_info, save_path, on_pair,
+def join_OSDB_list_OSDB_info(df_OSDB_list, df_OSDB_infos, save_path, on_pair,
+                             use_cols_OSDB_list=None, use_cols_OSDB_info=None,
                              key_alias=None, encoding="utf-8"):
     on_pair = on_pair or ("Name", "Name")
     on_df_OSDB_list = on_pair[0]
@@ -79,13 +80,7 @@ if __name__ == '__main__':
                                            f'data/dbdbio_OSDB_list/OSDB_info_crawling_202301_raw.csv')
     OSDB_info_joined_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_info_202301_joined.csv')
 
-    use_cols_OSDB_list = None
-    use_cols_OSDB_info = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
-                          "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year", "End Year",
-                          "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses",
-                          "Operating Systems"]
     df_OSDB_list = pd.read_csv(OSDB_crawling_path, encoding=encoding, index_col=False)
     df_OSDB_infos = pd.read_csv(OSDB_info_crawling_path, encoding=encoding, index_col=False)
-    join_OSDB_list_OSDB_info(df_OSDB_list, df_OSDB_infos, use_cols_OSDB_list, use_cols_OSDB_info,
-                             save_path=OSDB_info_joined_path, on_pair=("Name", "Name"), key_alias="DBMS",
-                             encoding=encoding)
+    join_OSDB_list_OSDB_info(df_OSDB_list, df_OSDB_infos, save_path=OSDB_info_joined_path, on_pair=("Name", "Name"),
+                             key_alias="DBMS", encoding=encoding)
