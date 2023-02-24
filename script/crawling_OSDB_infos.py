@@ -211,19 +211,23 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
 
     if ADD_MODE:
         df2 = df_dbms_infos
-        join = kwargs.get('join', 'outer')
-        df_dbms_infos_batched = pd.concat([df1, df2], join=join)
-        df_dbms_infos_batched.to_csv(temp_save_path, encoding='utf-8', index=False)
-        print(f"{temp_save_path} saved! idx_start_end:{idx_start_end}.")
-        if idx_start_end[1] < len_db_names:
+        has_new_data = idx_start_end[1] < len_db_names or len(df2)
+        if not has_new_data:  # The exit of recursive crawling
+            print(f"Index >= {len_db_names}, the crawling tasks has done! idx_start_end:{idx_start_end}.")
+            print(f'- Copy {temp_save_path} directly to {save_path}!')
+            shutil.copyfile(temp_save_path, save_path)
+            return STATE_OK
+        else:  # need breakpoint resumption
+            # save the data crawled in this batch
+            join = kwargs.get('join', 'outer')
+            df_dbms_infos_batched = pd.concat([df1, df2], join=join)
+            df_dbms_infos_batched.to_csv(temp_save_path, encoding='utf-8', index=False)
+            print(f"{temp_save_path} saved! idx_start_end:{idx_start_end}.")
+            # Recursive crawling when this batch has new data
             new_idx_start_end = [idx_start_end[1], min(idx_start_end[1] + batch, len_db_names)]
             kwargs['idx_start_end'] = new_idx_start_end
             crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path, use_cols=use_cols,
                                      use_all_impl_cols=use_all_impl_cols, **kwargs)
-        else:
-            print(f'Index >= {len_db_names}. Done!')
-            shutil.copyfile(temp_save_path, save_path)
-            return STATE_OK
 
     # save to csv
     df_dbms_infos.to_csv(save_path, encoding='utf-8', index=False)
@@ -365,11 +369,11 @@ if __name__ == '__main__':
     batch = 20
     temp_save_path = OSDB_info_crawling_path.rstrip('.csv') + '_temp.csv'
     state = -1
-    # crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path=OSDB_info_crawling_path, mode=mode,
-    #                          temp_save_path=temp_save_path, batch=batch)
-    # use_cols = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
-    #             "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year", "End Year",
-    #             "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses", "Operating Systems"]
-    # pd_select_col(use_cols, temp_save_path, OSDB_info_crawling_path)
+    crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path=OSDB_info_crawling_path, mode=mode,
+                             temp_save_path=temp_save_path, batch=batch)
+    use_cols = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
+                "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year", "End Year",
+                "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses", "Operating Systems"]
+    pd_select_col(use_cols, temp_save_path, OSDB_info_crawling_path)
 
     recalc_OSDB_info(path=OSDB_info_crawling_path)
