@@ -95,6 +95,8 @@ def recalc_OSDB_list(path, encoding="utf-8", index_col=False):
 
 if __name__ == '__main__':
     # dbdb.io http link
+    # - use "https://dbdb.io/browse?type=open-source" to get all the open source databases in dbdb.io
+    # - use "https://dbdb.io/browse?q=*" to get all the databases in dbdb.io
     dbdbio_url = "https://dbdb.io"
     dbdbio_OSDB_url = dbdbio_url + "/browse?type=open-source"
     url_init = dbdbio_OSDB_url

@@ -77,6 +77,9 @@ headers = [header1, header2, header3, header4, header5, header6]
 if __name__ == '__main__':
 
     if UPDATE_OSDB_LIST:
+        # dbdb.io http link
+        # - use "https://dbdb.io/browse?type=open-source" to get all the open source databases in dbdb.io
+        # - use "https://dbdb.io/browse?q=*" to get all the databases in dbdb.io
         dbdbio_url = "https://dbdb.io"
         dbdbio_OSDB_url = dbdbio_url + "/browse?type=open-source"
         url_init = dbdbio_OSDB_url

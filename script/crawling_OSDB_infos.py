@@ -30,6 +30,7 @@ import urllib
 import pandas as pd
 
 from bs4 import BeautifulSoup
+from collections import Iterable
 from urllib import request
 
 STATE_OK = 0
@@ -298,9 +299,10 @@ def mapping_values2labels(item, **kwargs):
 
 def recalc_OSDB_info(path, encoding="utf-8", index_col=False):
     df_dbms_infos = pd.read_csv(path, encoding=encoding, index_col=index_col)
-    check_not_empty = lambda x: x.any()
+    check_not_empty = lambda x: any(x) if isinstance(x, Iterable) else pd.notna(x)
     check_distinct = lambda x: check_not_empty(x) and len(x) == len(set(x))
     is_from_github = lambda x: False if pd.isna(x) else str(x).startswith("https://github.com/")
+    get_github_owner_repo = lambda x: '/'.join(x.replace("https://github.com/", "").split("/")[:2]) if is_from_github(x) else ""
     to_int_str = lambda x: "" if pd.isna(x) else str(int(x))
     # def abstract_label_mapping_table(strs):
     #     return list(set(strs))
@@ -310,7 +312,11 @@ def recalc_OSDB_info(path, encoding="utf-8", index_col=False):
         "Name": {"validate_func": check_distinct},
         # Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
         "Data_Model_mapping": {"apply_param_preprocess_func": validate_label_mapping_table, "apply_func": mapping_values2labels, "input_col": "Data Model"},
-        "Source_Code_record_from_github": {"apply_func": is_from_github, "input_col": "Source Code"},
+        "has_open_source_github_repo": {"apply_func": lambda x: "Y" if is_from_github(x) else "", "input_col": "Source Code"},  # need to be labeled manually
+        "github_repo_link": {"apply_func": lambda x: get_github_owner_repo(x), "input_col": "Source Code"},  # need to be labeled manually
+        "org_name": {"apply_func": lambda x: x.split("/")[0] if x else "", "input_col": "github_repo_link"},
+        "repo_name": {"apply_func": lambda x: x.split("/")[1] if len(x.split("/")) > 1 else "", "input_col": "github_repo_link"},
+        "open_source_license": {"apply_func": lambda x: "Y" if check_not_empty(x) else "", "input_col": "Source Code"},
         "Start Year": {"apply_func": to_int_str},
         "End Year": {"apply_func": to_int_str},
     }
