@@ -6,6 +6,15 @@ Crawling the Open Source DBMS list from [dbdb.io/browse?type=open-source](https:
 
 Save as [OSDB_crawling_202301_raw.csv](./data/dbdbio_OSDB_list/OSDB_crawling_202301_raw.csv)
 
+About dbdb.io http link:
+- Use "https://dbdb.io/browse?type=open-source" to get all the open source databases in dbdb.io
+- Use "https://dbdb.io/browse?q=*" to get all the databases in dbdb.io
+
+This repository focus on the repositories which have image source codes and communities on github. 
+The commercial databases is not within the scope of crawling. 
+However, you can use "[dbdb.io/browse?q=*](https://www.dbdb.io/browse?q=*)" to crawl the entire data set if it is necessary.
+And the column "open_source_license" in "data/dbdbio_OSDB_list/OSDB_info_crawling_{month_yyyyMM}_raw.csv" may need to be re-labeled manually.
+
 # 2. recalc OSDB list
 The table of OSDB list csv have columns ["card_title", "card_title_href", "card_img_href", "card_text"]. 
 "card_title" is almost the DBMS name we want, however, some DBMS has the same card_title values: 
