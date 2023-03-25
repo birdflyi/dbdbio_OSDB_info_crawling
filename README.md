@@ -39,7 +39,7 @@ and get a new [dbdbio DBMS category labels mapping table](./data/existing_taggin
 - Convert type from float to str(int) for "Start Year" and "End Year" columns.
 
 # 5. join OSDB list and OSDB information
-Join OSDB list and OSDB information on the column "Name", and set the key name alias to 'DBMS' after joined.
+Join OSDB list and OSDB information on the column "Name", and set the key name alias to 'DBMS_uriform' after joined.
 
 Set use_cols_OSDB_list = None to use all fields of OSDB list, and set
 use_cols_OSDB_info = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
