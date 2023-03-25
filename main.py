@@ -119,4 +119,4 @@ if __name__ == '__main__':
         df_OSDB_list = pd.read_csv(OSDB_crawling_path, encoding=encoding, index_col=False)
         df_OSDB_infos = pd.read_csv(OSDB_info_crawling_path, encoding=encoding, index_col=False, dtype={'Start Year': str, 'End Year': str})
         join_OSDB_list_OSDB_info(df_OSDB_list, df_OSDB_infos, save_path=OSDB_info_joined_path, on_pair=("Name", "Name"),
-                                 key_alias="DBMS", encoding=encoding)
+                                 key_alias="DBMS_uriform", encoding=encoding)

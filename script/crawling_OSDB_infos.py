@@ -34,7 +34,7 @@ from collections import Iterable
 from urllib import request
 
 STATE_OK = 0
-
+KEY_ATTR_NAME = 'Name'
 
 def process_delimeter(s):
     # new line
@@ -143,9 +143,7 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
         if type(df_db_names_urls) == dict:
             df_db_names_urls = pd.DataFrame(df_db_names_urls.items(), columns=["db_names", "urls"])
 
-    KEY_ATTR_NAME = 'Name'
-
-    default_use_cols = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
+    default_use_cols = [KEY_ATTR_NAME, "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
                         "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year", "End Year",
                         "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses", "Operating Systems"]
     use_cols = use_cols or default_use_cols
@@ -187,7 +185,7 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
         db_name_uri = str(url).split('/')[-1]  # db_name_card_title may be duplicated! use db_name splited from url instead.
         print(f"{i}/{len_db_names}: Crawling data for {db_name_card_title} on {url} ...")
         header = headers[i % len(headers)]
-        dbms_info_record_attrs_dict = crawling_dbms_info_soup(url, header, use_elem_dict, preset_dict={"Name": db_name_uri})
+        dbms_info_record_attrs_dict = crawling_dbms_info_soup(url, header, use_elem_dict, preset_dict={KEY_ATTR_NAME: db_name_uri})
         if use_all_impl_cols:
             use_cols = list(dbms_info_record_attrs_dict.keys())
         try:
@@ -309,7 +307,7 @@ def recalc_OSDB_info(path, encoding="utf-8", index_col=False):
     # def mapping_values2labels(strs):
     #     set(strs)
     recalc_func_dict = {
-        "Name": {"validate_func": check_distinct},
+        KEY_ATTR_NAME: {"validate_func": check_distinct},
         # Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
         "Data_Model_mapping": {"apply_param_preprocess_func": validate_label_mapping_table, "apply_func": mapping_values2labels, "input_col": "Data Model"},
         "has_open_source_github_repo": {"apply_func": lambda x: "Y" if is_from_github(x) else "", "input_col": "Source Code"},  # need to be labeled manually
