@@ -121,6 +121,7 @@ def crawling_dbms_info_soup(url_init, header, use_elem_dict, **kwargs):
 
     if temp_value_part_strs:
         temp_value_full_strs = ' '.join(temp_value_part_strs).strip()
+        temp_value_full_strs = process_delimeter(temp_value_full_strs)
         card_texts.append(temp_value_full_strs)
         temp_value_part_strs = []
     assert(len(card_titles) == len(card_texts))
@@ -154,7 +155,8 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
         if KEY_ATTR_NAME not in use_cols:
             use_cols = [KEY_ATTR_NAME] + use_cols
 
-    df_dbms_infos = pd.DataFrame()
+    df_dbms_infos = pd.DataFrame(columns=use_cols)
+    df_dbms_infos = df_dbms_infos.T
 
     len_db_names = len(df_db_names_urls)
 
@@ -343,7 +345,7 @@ if __name__ == '__main__':
     OSDB_crawling_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_crawling_{month_yyyyMM}_raw.csv')
     OSDB_info_crawling_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_info_crawling_{month_yyyyMM}_raw.csv')
 
-    encoding='utf-8'
+    encoding = 'utf-8'
     df_OSDB_table = pd.read_csv(OSDB_crawling_path, encoding=encoding, index_col=False)
     # dbdbio_insitelink
     df_db_names_urls = df_OSDB_table[['card_title', 'card_title_href']]
