@@ -124,11 +124,13 @@ if __name__ == '__main__':
         join_OSDB_list_OSDB_info(df_OSDB_list, df_OSDB_infos, save_path=OSDB_info_joined_path, on_pair=("Name", "Name"),
                                  key_alias="DBMS_uriform", encoding=encoding)
     LAST_MONTH_MANULABELED = True
+    UPDATE_START_CHECKPOINT_USE_MANULABELED = 1
     if LAST_MONTH_MANULABELED:
-        df_OSDB_list_OSDB_info_joined = pd.read_csv(OSDB_info_joined_path, encoding=encoding, index_col=False, dtype=default_dtype)
+        update_start_checkpoint_path = OSDB_info_joined_manulabled_path if UPDATE_START_CHECKPOINT_USE_MANULABELED else OSDB_info_joined_path
+        df_update_start_checkpoint = pd.read_csv(update_start_checkpoint_path, encoding=encoding, index_col=False, dtype=default_dtype)
         df_src_OSDB_info_joined_last_month_manulabeled = pd.read_csv(src_OSDB_info_joined_last_month_manulabeled_path, encoding=encoding, index_col=False, dtype=default_dtype)
-        key_this_month_joined, key_last_month_joined_manulabeled = "DBMS_uriform", "DBMS_uriform"
-        df_OSDB_list_OSDB_info_joined_manulabeled = df_OSDB_list_OSDB_info_joined.set_index(key_this_month_joined, inplace=False)
+        key_update_start_checkpoint, key_last_month_joined_manulabeled = "DBMS_uriform", "DBMS_uriform"
+        df_OSDB_list_OSDB_info_joined_manulabeled = df_update_start_checkpoint.set_index(key_update_start_checkpoint, inplace=False)
         df_src_OSDB_info_joined_last_month_manulabeled.set_index(key_last_month_joined_manulabeled, inplace=True)
         # overwrite=False: only update values that are NA in the original DataFrame.
         df_OSDB_list_OSDB_info_joined_manulabeled.update(df_src_OSDB_info_joined_last_month_manulabeled, join='left', overwrite=False, errors='ignore')
