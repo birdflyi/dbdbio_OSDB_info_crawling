@@ -51,9 +51,11 @@ def get_last_month_yyyyMM(curr_month_yyyyMM):
 
 
 last_month_yyyyMM = get_last_month_yyyyMM(month_yyyyMM)
+src_OSDB_info_joined_last_month_manulabeled_path = os.path.join(pkg_rootdir, f'data/manulabeled/OSDB_info_{last_month_yyyyMM}_joined_manulabled.csv')
 OSDB_crawling_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_crawling_{month_yyyyMM}_raw.csv')
 OSDB_info_crawling_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_info_crawling_{month_yyyyMM}_raw.csv')
 OSDB_info_joined_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_info_{month_yyyyMM}_joined.csv')
+OSDB_info_joined_manulabled_path = os.path.join(pkg_rootdir, f'data/manulabeled/OSDB_info_{month_yyyyMM}_joined_manulabled.csv')
 
 encoding = 'utf-8'
 
@@ -115,8 +117,20 @@ if __name__ == '__main__':
     if RECALC_OSDB_INFO:
         recalc_OSDB_info(path=OSDB_info_crawling_path)
 
+    default_dtype = {'Start Year': str, 'End Year': str}
     if JOIN_OSDB_SUMMARY_INFO_ON_NAME:
         df_OSDB_list = pd.read_csv(OSDB_crawling_path, encoding=encoding, index_col=False)
-        df_OSDB_infos = pd.read_csv(OSDB_info_crawling_path, encoding=encoding, index_col=False, dtype={'Start Year': str, 'End Year': str})
+        df_OSDB_infos = pd.read_csv(OSDB_info_crawling_path, encoding=encoding, index_col=False, dtype=default_dtype)
         join_OSDB_list_OSDB_info(df_OSDB_list, df_OSDB_infos, save_path=OSDB_info_joined_path, on_pair=("Name", "Name"),
                                  key_alias="DBMS_uriform", encoding=encoding)
+    LAST_MONTH_MANULABELED = True
+    if LAST_MONTH_MANULABELED:
+        df_OSDB_list_OSDB_info_joined = pd.read_csv(OSDB_info_joined_path, encoding=encoding, index_col=False, dtype=default_dtype)
+        df_src_OSDB_info_joined_last_month_manulabeled = pd.read_csv(src_OSDB_info_joined_last_month_manulabeled_path, encoding=encoding, index_col=False, dtype=default_dtype)
+        key_this_month_joined, key_last_month_joined_manulabeled = "DBMS_uriform", "DBMS_uriform"
+        df_OSDB_list_OSDB_info_joined_manulabeled = df_OSDB_list_OSDB_info_joined.set_index(key_this_month_joined, inplace=False)
+        df_src_OSDB_info_joined_last_month_manulabeled.set_index(key_last_month_joined_manulabeled, inplace=True)
+        # overwrite=False: only update values that are NA in the original DataFrame.
+        df_OSDB_list_OSDB_info_joined_manulabeled.update(df_src_OSDB_info_joined_last_month_manulabeled, join='left', overwrite=False, errors='ignore')
+        df_OSDB_list_OSDB_info_joined_manulabeled.reset_index(inplace=True)
+        df_OSDB_list_OSDB_info_joined_manulabeled.to_csv(OSDB_info_joined_manulabled_path, encoding=encoding, index=False)
