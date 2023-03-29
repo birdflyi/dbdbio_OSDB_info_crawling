@@ -27,6 +27,7 @@ import pandas as pd
 
 from script.crawling_OSDB_list import crawling_OSDB_list_soup, recalc_OSDB_list
 from script.crawling_OSDB_infos import crawling_OSDB_infos_soup, pd_select_col, recalc_OSDB_info
+from script.db_info_fusion import merge_info_start_checkpoint_last_month_manulabeled
 from script.join_OSDB_list_OSDB_info import join_OSDB_list_OSDB_info
 
 UPDATE_OSDB_LIST = False  # This will take a long time to crawl the dbdb.io website if set to True...
@@ -129,10 +130,8 @@ if __name__ == '__main__':
         update_start_checkpoint_path = OSDB_info_joined_manulabeled_path if UPDATE_START_CHECKPOINT_USE_MANULABELED else OSDB_info_joined_path
         df_update_start_checkpoint = pd.read_csv(update_start_checkpoint_path, encoding=encoding, index_col=False, dtype=default_dtype)
         df_src_OSDB_info_joined_last_month_manulabeled = pd.read_csv(src_OSDB_info_joined_last_month_manulabeled_path, encoding=encoding, index_col=False, dtype=default_dtype)
-        key_update_start_checkpoint, key_last_month_joined_manulabeled = "DBMS_uriform", "DBMS_uriform"
-        df_OSDB_list_OSDB_info_joined_manulabeled = df_update_start_checkpoint.set_index(key_update_start_checkpoint, inplace=False)
-        df_src_OSDB_info_joined_last_month_manulabeled.set_index(key_last_month_joined_manulabeled, inplace=True)
-        # overwrite=False: only update values that are NA in the original DataFrame.
-        df_OSDB_list_OSDB_info_joined_manulabeled.update(df_src_OSDB_info_joined_last_month_manulabeled, join='left', overwrite=False, errors='ignore')
-        df_OSDB_list_OSDB_info_joined_manulabeled.reset_index(inplace=True)
-        df_OSDB_list_OSDB_info_joined_manulabeled.to_csv(OSDB_info_joined_manulabeled_path, encoding=encoding, index=False)
+        merge_info_start_checkpoint_last_month_manulabeled(df_update_start_checkpoint, df_src_OSDB_info_joined_last_month_manulabeled,
+                                                           save_path=OSDB_info_joined_manulabeled_path, input_key_colname_pair=["DBMS_uriform", "DBMS_uriform"],
+                                                           output_key_colname="DBMS_uriform", conflict_delimiter="#start_checkpoint>|<last_month_manulabeled#", encoding=encoding)
+
+    # Solve conflicts in the OSDB_info_joined_manulabeled_path manually.
