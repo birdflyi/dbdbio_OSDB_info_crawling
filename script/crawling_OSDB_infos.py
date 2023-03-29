@@ -30,8 +30,9 @@ import urllib
 import pandas as pd
 
 from bs4 import BeautifulSoup
-from collections import Iterable
 from urllib import request
+
+from script.validate import ValidateFunc
 
 STATE_OK = 0
 KEY_ATTR_NAME = 'Name'
@@ -299,24 +300,21 @@ def mapping_values2labels(item, **kwargs):
 
 def recalc_OSDB_info(path, encoding="utf-8", index_col=False):
     df_dbms_infos = pd.read_csv(path, encoding=encoding, index_col=index_col)
-    check_not_empty = lambda x: any(x) if isinstance(x, Iterable) else pd.notna(x)
-    check_distinct = lambda x: check_not_empty(x) and len(x) == len(set(x))
-    is_from_github = lambda x: False if pd.isna(x) else str(x).startswith("https://github.com/")
-    get_github_owner_repo = lambda x: '/'.join(x.replace("https://github.com/", "").split("/")[:2]) if is_from_github(x) else ""
     to_int_str = lambda x: "" if pd.isna(x) else str(int(x))
-    # def abstract_label_mapping_table(strs):
-    #     return list(set(strs))
-    # def mapping_values2labels(strs):
-    #     set(strs)
     recalc_func_dict = {
-        KEY_ATTR_NAME: {"validate_func": check_distinct},
+        KEY_ATTR_NAME: {"validate_func": ValidateFunc.check_distinct},
         # Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
         "Data_Model_mapping": {"apply_param_preprocess_func": validate_label_mapping_table, "apply_func": mapping_values2labels, "input_col": "Data Model"},
-        "has_open_source_github_repo": {"apply_func": lambda x: "Y" if is_from_github(x) else "", "input_col": "Source Code"},  # need to be labeled manually
-        "github_repo_link": {"apply_func": lambda x: get_github_owner_repo(x), "input_col": "Source Code"},  # need to be labeled manually
+        "has_open_source_github_repo": {"apply_func": lambda x: "Y" if ValidateFunc.has_open_source_github_repo(x) else "",
+                                        "input_col": ["Website", "Source Code"], "apply_param_preprocess_func": lambda x: {"axis": 1}},  # need to be labeled manually
+        "github_repo_link": {"apply_func": lambda x: get_github_owner_repo(x), "input_col": ["Website", "Source Code"],
+                             "apply_param_preprocess_func": lambda x: {"axis": 1}},  # need to be labeled manually
         "org_name": {"apply_func": lambda x: x.split("/")[0] if x else "", "input_col": "github_repo_link"},
         "repo_name": {"apply_func": lambda x: x.split("/")[1] if len(x.split("/")) > 1 else "", "input_col": "github_repo_link"},
-        "open_source_license": {"apply_func": lambda x: "Y" if check_not_empty(x) else "", "input_col": "Source Code"},
+        "open_source_license": {
+            "apply_func": lambda x: "Y" if ValidateFunc.check_open_source_license(x, strict=True) else "",
+            "input_col": ["Project Type", "Website", "Source Code", "Licenses"],
+            "apply_param_preprocess_func": lambda x: {"axis": 1}},
         "Start Year": {"apply_func": to_int_str},
         "End Year": {"apply_func": to_int_str},
     }
@@ -338,6 +336,26 @@ def recalc_OSDB_info(path, encoding="utf-8", index_col=False):
     df_dbms_infos.to_csv(save_path, encoding='utf-8', index=False)
     print(save_path, 'recalculated!')
     return None
+
+
+def get_github_owner_repo(series):
+    series = pd.Series(series)
+    get_github_owner_repo_from_github_website = lambda x: '/'.join(
+        x.replace("https://github.com/", "").split("/")[:2]) if ValidateFunc.is_from_github(x) else ""
+    col__website = "Website"
+    col__source_code = "Source Code"
+    has_open_source_github_repo_colnames = [col__website, col__source_code]
+    defaut_use_col = col__source_code
+    github_link_uri = get_github_owner_repo_from_github_website(series[defaut_use_col])
+    if github_link_uri:
+        return github_link_uri
+    else:
+        has_open_source_github_repo_colnames.remove(defaut_use_col)
+        for c in has_open_source_github_repo_colnames:
+            github_link_uri = get_github_owner_repo_from_github_website(series[c])
+            if github_link_uri:
+                return github_link_uri
+    return github_link_uri
 
 
 if __name__ == '__main__':
