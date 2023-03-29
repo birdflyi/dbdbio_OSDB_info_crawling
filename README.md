@@ -47,6 +47,10 @@ use_cols_OSDB_info = ["Name", "card_title", "Description", "Data Model", "Query 
                       "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses",
                       "Operating Systems"] as default.
 
+# 6. Merging the current month manulabeled data with last month manulabeled data
+Find difference between current month manulabeled data(e.g. OSDB_info_202303_joined_manulabeled.csv) and last month manulabeled data(e.g. OSDB_info_202302_joined_manulabeled.csv). 
+Solve conflicts in the merged table(default overwrite the current month manulabeled data) manually.
+
 ---
 ### 1. The reason for crawling OSDB information from dbdb.io
 See [X-lab2017/open-digger#1136](https://github.com/X-lab2017/open-digger/issues/1136)

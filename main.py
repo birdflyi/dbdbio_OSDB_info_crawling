@@ -134,4 +134,4 @@ if __name__ == '__main__':
                                                            save_path=OSDB_info_joined_manulabeled_path, input_key_colname_pair=["DBMS_uriform", "DBMS_uriform"],
                                                            output_key_colname="DBMS_uriform", conflict_delimiter="#start_checkpoint>|<last_month_manulabeled#", encoding=encoding)
 
-    # Solve conflicts in the OSDB_info_joined_manulabeled_path manually.
+    # Solve conflicts in the merged table(default overwrite the current month manulabeled data e.g. OSDB_info_202303_joined_manulabeled.csv) manually.
