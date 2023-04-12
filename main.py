@@ -36,7 +36,7 @@ RECALC_OSDB_LIST = True  # Add "Name" column
 RECALC_OSDB_INFO = True  # Check "Name" column; Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
 JOIN_OSDB_SUMMARY_INFO_ON_NAME = True  # join OSDB summary and OSDB_infos on filed 'Name' and 'Name'
 
-month_yyyyMM = "202303"
+month_yyyyMM = "202304"
 
 
 def get_last_month_yyyyMM(curr_month_yyyyMM):
@@ -125,7 +125,7 @@ if __name__ == '__main__':
         join_OSDB_list_OSDB_info(df_OSDB_list, df_OSDB_infos, save_path=OSDB_info_joined_path, on_pair=("Name", "Name"),
                                  key_alias="DBMS_uriform", encoding=encoding)
     LAST_MONTH_MANULABELED = True
-    UPDATE_START_CHECKPOINT_USE_MANULABELED = 1
+    UPDATE_START_CHECKPOINT_USE_MANULABELED = 0
     if LAST_MONTH_MANULABELED:
         update_start_checkpoint_path = OSDB_info_joined_manulabeled_path if UPDATE_START_CHECKPOINT_USE_MANULABELED else OSDB_info_joined_path
         df_update_start_checkpoint = pd.read_csv(update_start_checkpoint_path, encoding=encoding, index_col=False, dtype=default_dtype)

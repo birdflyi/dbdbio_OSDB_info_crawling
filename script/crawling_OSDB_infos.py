@@ -162,7 +162,8 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
     len_db_names = len(df_db_names_urls)
 
     df1 = pd.DataFrame()
-    batch = 100
+    default_batch = 20
+    batch = kwargs.get('batch', default_batch)
     idx_start_end = [0, len_db_names]
 
     if ADD_MODE:
@@ -176,7 +177,6 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
             pass
 
         len_df1 = len(df1)
-        batch = kwargs.get('batch', batch)
         idx_start_end = kwargs.get('idx_start_end', [len_df1, min(len_df1 + batch, len_db_names)])
 
         if not (len_df1 == idx_start_end[0] and idx_start_end[0] <= idx_start_end[1]):
@@ -228,12 +228,14 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
             # Recursive crawling when this batch has new data
             new_idx_start_end = [idx_start_end[1], min(idx_start_end[1] + batch, len_db_names)]
             kwargs['idx_start_end'] = new_idx_start_end
+            kwargs["crawling_done"] = new_idx_start_end[-1] >= len_db_names
             crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path, use_cols=use_cols,
                                      use_all_impl_cols=use_all_impl_cols, **kwargs)
 
     # save to csv
-    df_dbms_infos.to_csv(save_path, encoding='utf-8', index=False)
-    print(save_path, 'saved!')
+    if not kwargs.get("crawling_done", False):
+        df_dbms_infos.to_csv(save_path, encoding='utf-8', index=False)
+        print(save_path, 'saved!')
     return STATE_OK
 
 

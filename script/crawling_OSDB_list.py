@@ -71,8 +71,11 @@ def crawling_OSDB_list_soup(url_init, header, use_elem_dict, save_path, **kwargs
         record_items = [card_title, card_title_href, card_img_href, card_text]
         osdb_records.append(record_items)
 
-    # 4. save to csv
+    # 4. Keep the last unique url
     df = pd.DataFrame(osdb_records, columns=db_column_names)
+    df.drop_duplicates(subset=["card_title_href"], keep="last", inplace=True)
+
+    # 5. save to csv
     df.to_csv(save_path, encoding='utf-8', index=False)
     print(save_path, 'saved!')
     return None

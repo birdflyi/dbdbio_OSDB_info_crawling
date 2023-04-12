@@ -42,7 +42,7 @@ def merge_info_start_checkpoint_last_month_manulabeled(df1, df2, save_path, inpu
     except ValueError:
         pass
 
-    if merge_columns not in merge_columns:
+    if output_key_colname not in merge_columns:
         merge_columns = [output_key_colname] + merge_columns
     use_columns_merged = use_columns_merged or merge_columns
 
