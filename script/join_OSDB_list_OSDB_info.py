@@ -57,9 +57,9 @@ def join_OSDB_list_OSDB_info(df_OSDB_list, df_OSDB_infos, save_path, on_pair,
     df_OSDB_list_filtered = df_OSDB_list[use_cols_OSDB_list]
     df_OSDB_info_filtered = df_OSDB_infos[use_cols_OSDB_info]
     df_OSDB_list_filtered.set_index(on_df_OSDB_list, inplace=True)
-    df_OSDB_list_filtered.index.name = key_alias  # change index name from "Name" to "DBMS_uriform"
+    df_OSDB_list_filtered.index.name = key_alias  # change index name from "Name" to "DBMS_urnform"
     df_OSDB_info_filtered.set_index(on_df_OSDB_info, inplace=True)
-    df_OSDB_info_filtered.index.name = key_alias  # change index name from "Name" to "DBMS_uriform"
+    df_OSDB_info_filtered.index.name = key_alias  # change index name from "Name" to "DBMS_urnform"
     # see https://stackoverflow.com/questions/26645515/pandas-join-issue-columns-overlap-but-no-suffix-specified
     # result: "card_title_left" is overlap with "card_title_right", remove the overlaped column in right df df_OSDB_info_filtered from use_cols_OSDB_info
     df_OSDB_list_OSDB_info_joined = df_OSDB_list_filtered.join(df_OSDB_info_filtered, on=key_alias, how='left',
@@ -83,4 +83,4 @@ if __name__ == '__main__':
     df_OSDB_list = pd.read_csv(OSDB_crawling_path, encoding=encoding, index_col=False)
     df_OSDB_infos = pd.read_csv(OSDB_info_crawling_path, encoding=encoding, index_col=False, dtype={'Start Year': str, 'End Year': str})
     join_OSDB_list_OSDB_info(df_OSDB_list, df_OSDB_infos, save_path=OSDB_info_joined_path, on_pair=("Name", "Name"),
-                             key_alias="DBMS_uriform", encoding=encoding)
+                             key_alias="DBMS_urnform", encoding=encoding)

@@ -185,10 +185,10 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
     print('idx_start_end:', idx_start_end)
     for i in list(range(len_db_names))[idx_start_end[0]: idx_start_end[1]]:
         db_name_card_title, url = df_db_names_urls.iloc[i]
-        db_name_uri = str(url).split('/')[-1]  # db_name_card_title may be duplicated! use db_name splited from url instead.
+        db_name_urn = str(url).split('/')[-1]  # db_name_card_title may be duplicated! use db_name splited from url instead.
         print(f"{i}/{len_db_names}: Crawling data for {db_name_card_title} on {url} ...")
         header = headers[i % len(headers)]
-        dbms_info_record_attrs_dict = crawling_dbms_info_soup(url, header, use_elem_dict, preset_dict={KEY_ATTR_NAME: db_name_uri})
+        dbms_info_record_attrs_dict = crawling_dbms_info_soup(url, header, use_elem_dict, preset_dict={KEY_ATTR_NAME: db_name_urn})
         if use_all_impl_cols:
             use_cols = list(dbms_info_record_attrs_dict.keys())
         try:
@@ -198,13 +198,13 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
                   "update KEY_ATTR_NAME!")
             return
 
-        if db_name_uri == crawling_db_name:
+        if db_name_urn == crawling_db_name:
             series_dbms_info = pd.Series(data=None, index=use_cols, dtype=str)
             series_dbms_info.update(pd.Series(dbms_info_record_attrs_dict))
             # series_dbms_info = series_dbms_info[use_cols]
-            df_dbms_infos[db_name_uri] = series_dbms_info
+            df_dbms_infos[db_name_urn] = series_dbms_info
         else:
-            print(f"Unmatched dbms name, expect {db_name_uri} but get {crawling_db_name} please check the website: {url}")
+            print(f"Unmatched dbms name, expect {db_name_urn} but get {crawling_db_name} please check the website: {url}")
         time.sleep(0.5)
         # break
 

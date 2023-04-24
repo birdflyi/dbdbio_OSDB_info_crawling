@@ -123,7 +123,7 @@ if __name__ == '__main__':
         df_OSDB_list = pd.read_csv(OSDB_crawling_path, encoding=encoding, index_col=False)
         df_OSDB_infos = pd.read_csv(OSDB_info_crawling_path, encoding=encoding, index_col=False, dtype=default_dtype)
         join_OSDB_list_OSDB_info(df_OSDB_list, df_OSDB_infos, save_path=OSDB_info_joined_path, on_pair=("Name", "Name"),
-                                 key_alias="DBMS_uriform", encoding=encoding)
+                                 key_alias="DBMS_urnform", encoding=encoding)
     LAST_MONTH_MANULABELED = True
     UPDATE_START_CHECKPOINT_USE_MANULABELED = 0
     if LAST_MONTH_MANULABELED:
@@ -131,7 +131,7 @@ if __name__ == '__main__':
         df_update_start_checkpoint = pd.read_csv(update_start_checkpoint_path, encoding=encoding, index_col=False, dtype=default_dtype)
         df_src_OSDB_info_joined_last_month_manulabeled = pd.read_csv(src_OSDB_info_joined_last_month_manulabeled_path, encoding=encoding, index_col=False, dtype=default_dtype)
         merge_info_start_checkpoint_last_month_manulabeled(df_update_start_checkpoint, df_src_OSDB_info_joined_last_month_manulabeled,
-                                                           save_path=OSDB_info_joined_manulabeled_path, input_key_colname_pair=["DBMS_uriform", "DBMS_uriform"],
-                                                           output_key_colname="DBMS_uriform", conflict_delimiter="#start_checkpoint>|<last_month_manulabeled#", encoding=encoding)
+                                                           save_path=OSDB_info_joined_manulabeled_path, input_key_colname_pair=["DBMS_urnform", "DBMS_urnform"],
+                                                           output_key_colname="DBMS_urnform", conflict_delimiter="#start_checkpoint>|<last_month_manulabeled#", encoding=encoding)
 
     # Solve conflicts in the merged table(default overwrite the current month manulabeled data e.g. OSDB_info_202303_joined_manulabeled.csv) manually.
