@@ -43,8 +43,8 @@ def process_delimeter(s):
     s = re.sub(r'\r', ' ', s)
 
     # deduplicate
-    s = re.sub(r' +', ' ', s)
-    s = re.sub(r',+', ',', s)
+    s = re.sub(r'\s+', ' ', s)
+    s = re.sub(r'(\s*,+\s*)+', ',', s)
     return s
 
 
