@@ -307,7 +307,7 @@ def recalc_OSDB_info(path, encoding="utf-8", index_col=False):
         KEY_ATTR_NAME: {"validate_func": ValidateFunc.check_distinct},
         # Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
         "Data_Model_mapping": {"apply_param_preprocess_func": validate_label_mapping_table, "apply_func": mapping_values2labels, "input_col": "Data Model"},
-        "has_open_source_github_repo": {"apply_func": lambda x: "Y" if ValidateFunc.has_open_source_github_repo(x) else "",
+        "has_github_repo": {"apply_func": lambda x: "Y" if ValidateFunc.has_github_repo(x) else "",
                                         "input_col": ["Website", "Source Code"], "apply_param_preprocess_func": lambda x: {"axis": 1}},  # need to be labeled manually
         "github_repo_link": {"apply_func": lambda x: get_github_owner_repo(x), "input_col": ["Website", "Source Code"],
                              "apply_param_preprocess_func": lambda x: {"axis": 1}},  # need to be labeled manually
@@ -346,14 +346,14 @@ def get_github_owner_repo(series):
         x.replace("https://github.com/", "").split("/")[:2]) if ValidateFunc.is_from_github(x) else ""
     col__website = "Website"
     col__source_code = "Source Code"
-    has_open_source_github_repo_colnames = [col__website, col__source_code]
+    has_github_repo_colnames = [col__website, col__source_code]
     defaut_use_col = col__source_code
     github_link_uri = get_github_owner_repo_from_github_website(series[defaut_use_col])
     if github_link_uri:
         return github_link_uri
     else:
-        has_open_source_github_repo_colnames.remove(defaut_use_col)
-        for c in has_open_source_github_repo_colnames:
+        has_github_repo_colnames.remove(defaut_use_col)
+        for c in has_github_repo_colnames:
             github_link_uri = get_github_owner_repo_from_github_website(series[c])
             if github_link_uri:
                 return github_link_uri

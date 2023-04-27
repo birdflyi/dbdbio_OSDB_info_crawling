@@ -165,18 +165,18 @@ class ValidateFunc:
         return flag
 
     @staticmethod
-    def has_open_source_github_repo(series):
+    def has_github_repo(series):
         flag = False
         series = pd.Series(series)
         col__website = "Website"
         col__source_code = "Source Code"
-        has_open_source_github_repo_colnames = [col__website, col__source_code]
-        temp_has_open_source_github_repo_colnames = []
-        for c in has_open_source_github_repo_colnames:
+        has_github_repo_colnames = [col__website, col__source_code]
+        temp_has_github_repo_colnames = []
+        for c in has_github_repo_colnames:
             if c in list(series.index.values):
-                temp_has_open_source_github_repo_colnames.append(c)
-        if len(temp_has_open_source_github_repo_colnames):
-            for c in temp_has_open_source_github_repo_colnames:
+                temp_has_github_repo_colnames.append(c)
+        if len(temp_has_github_repo_colnames):
+            for c in temp_has_github_repo_colnames:
                 if ValidateFunc.is_from_github(series[c]):
                     flag = True
                     break
@@ -188,13 +188,13 @@ class ValidateFunc:
         series = pd.Series(series)
         col__website = "Website"
         col__source_code = "Source Code"
-        has_open_source_github_repo_colnames = [col__website, col__source_code]
+        has_github_repo_colnames = [col__website, col__source_code]
         defaut_use_col = col__source_code
         if pd.notna(series[defaut_use_col]):
             flag = True
         else:
-            has_open_source_github_repo_colnames.remove(defaut_use_col)
-            for c in has_open_source_github_repo_colnames:
+            has_github_repo_colnames.remove(defaut_use_col)
+            for c in has_github_repo_colnames:
                 if ValidateFunc.is_from_common_opensource_platforms(series[c]):
                     flag = True
                     break
