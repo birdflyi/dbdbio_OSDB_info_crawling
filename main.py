@@ -30,13 +30,13 @@ from script.crawling_OSDB_infos import crawling_OSDB_infos_soup, pd_select_col, 
 from script.db_info_fusion import merge_info_start_checkpoint_last_month_manulabeled
 from script.join_OSDB_list_OSDB_info import join_OSDB_list_OSDB_info
 
-UPDATE_OSDB_LIST = False  # This will take a long time to crawl the dbdb.io website if set to True...
+UPDATE_OSDB_LIST = True  # This will take a long time to crawl the dbdb.io website if set to True...
 UPDATE_OSDB_INFO = True  # This will take a long long time to crawl many dbdb.io websites if set to True......
 RECALC_OSDB_LIST = True  # Add "Name" column
 RECALC_OSDB_INFO = True  # Check "Name" column; Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
 JOIN_OSDB_SUMMARY_INFO_ON_NAME = True  # join OSDB summary and OSDB_infos on filed 'Name' and 'Name'
 
-month_yyyyMM = "202304"
+month_yyyyMM = "202305"
 
 
 def get_last_month_yyyyMM(curr_month_yyyyMM):

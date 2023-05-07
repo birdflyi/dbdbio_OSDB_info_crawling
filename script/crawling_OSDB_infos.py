@@ -44,14 +44,14 @@ def process_delimeter(s):
 
     # deduplicate
     s = re.sub(r'\s+', ' ', s)
-    s = re.sub(r'(\s*,+\s*)+', ',', s)
+    s = re.sub(r'(\s*,+)+', ',', s)
     return s
 
 
 def crawling_dbms_info_soup(url_init, header, use_elem_dict, **kwargs):
     socket.setdefaulttimeout(60)
     request = urllib.request.Request(url_init, headers=header)
-    response = urllib.request.urlopen(request, timeout=3)
+    response = urllib.request.urlopen(request, timeout=10)
     response_body = response.read().decode('utf-8').replace('&shy;', '')
     response.close()  # 注意关闭response
     soup = BeautifulSoup(response_body, 'lxml')  # 利用bs4库解析html
@@ -145,23 +145,30 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
         if type(df_db_names_urls) == dict:
             df_db_names_urls = pd.DataFrame(df_db_names_urls.items(), columns=["db_names", "urls"])
 
-    default_use_cols = [KEY_ATTR_NAME, "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
-                        "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year", "End Year",
-                        "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses", "Operating Systems"]
-    use_cols = use_cols or default_use_cols
+    default_use_cols = [KEY_ATTR_NAME, "card_title", "Description", "Data Model", "Query Interface", "System Architecture",
+                        "Website", "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year",
+                        "End Year", "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses",
+                        "Operating Systems", "Twitter", "Compression", "Storage Architecture", "Storage Model",
+                        "Checkpoints", "Concurrency Control", "Foreign Keys", "Indexes", "Isolation Levels", "Joins",
+                        "Logging", "Query Compilation", "Query Execution", "Stored Procedures", "Views", "Derived From",
+                        "Wikipedia", "Storage Organization", "Inspired By", "Parallel Execution", "Storage Format",
+                        "Acquired By", "Compatible With", "Former Name"]
     if use_all_impl_cols:
+        use_cols = default_use_cols
         if use_cols:
             print("Warning: use_all_impl_cols=True will disable the parameter use_cols!")
     else:
-        if KEY_ATTR_NAME not in use_cols:
-            use_cols = [KEY_ATTR_NAME] + use_cols
+        use_cols = use_cols or default_use_cols
+
+    if KEY_ATTR_NAME not in use_cols:
+        use_cols = [KEY_ATTR_NAME] + use_cols
 
     df_dbms_infos = pd.DataFrame(columns=use_cols)
     df_dbms_infos = df_dbms_infos.T
 
     len_db_names = len(df_db_names_urls)
 
-    df1 = pd.DataFrame()
+    df1 = pd.DataFrame(columns=use_cols)
     default_batch = 20
     batch = kwargs.get('batch', default_batch)
     idx_start_end = [0, len_db_names]
@@ -171,6 +178,7 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
         index_col = kwargs.get('index_col', False)
         try:
             df1 = pd.read_csv(temp_save_path, encoding=encoding, index_col=index_col)
+            df1 = df1[use_cols]
         except FileNotFoundError:
             df1.to_csv(temp_save_path, encoding='utf-8', index=False)
         except BaseException:
@@ -182,15 +190,17 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
         if not (len_df1 == idx_start_end[0] and idx_start_end[0] <= idx_start_end[1]):
             raise ValueError(f"Wrong settings: len_df1 = {len_df1} should be in {idx_start_end}!")
 
-    print('idx_start_end:', idx_start_end)
+    order_id_start_end = [idx_start_end[0] + 1, idx_start_end[1]]
+    print('order_id_start_end:', order_id_start_end)
     for i in list(range(len_db_names))[idx_start_end[0]: idx_start_end[1]]:
         db_name_card_title, url = df_db_names_urls.iloc[i]
         db_name_urn = str(url).split('/')[-1]  # db_name_card_title may be duplicated! use db_name splited from url instead.
-        print(f"{i}/{len_db_names}: Crawling data for {db_name_card_title} on {url} ...")
+        print(f"{i + 1}/{len_db_names}: Crawling data for {db_name_card_title} on {url} ...")
         header = headers[i % len(headers)]
         dbms_info_record_attrs_dict = crawling_dbms_info_soup(url, header, use_elem_dict, preset_dict={KEY_ATTR_NAME: db_name_urn})
         if use_all_impl_cols:
-            use_cols = list(dbms_info_record_attrs_dict.keys())
+            temp_use_cols = list(dbms_info_record_attrs_dict.keys())
+            use_cols.extend(e for e in temp_use_cols if e not in use_cols)
         try:
             crawling_db_name = dbms_info_record_attrs_dict[KEY_ATTR_NAME]
         except ValueError:
@@ -214,12 +224,7 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
     if ADD_MODE:
         df2 = df_dbms_infos
         has_new_data = idx_start_end[1] < len_db_names or len(df2)
-        if not has_new_data:  # The exit of recursive crawling
-            print(f"Index >= {len_db_names}, the crawling tasks has done! idx_start_end:{idx_start_end}.")
-            print(f'- Copy {temp_save_path} directly to {save_path}!')
-            shutil.copyfile(temp_save_path, save_path)
-            return STATE_OK
-        else:  # need breakpoint resumption
+        if has_new_data:  # need breakpoint resumption
             # save the data crawled in this batch
             join = kwargs.get('join', 'outer')
             df_dbms_infos_batched = pd.concat([df1, df2], join=join)
@@ -228,12 +233,16 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
             # Recursive crawling when this batch has new data
             new_idx_start_end = [idx_start_end[1], min(idx_start_end[1] + batch, len_db_names)]
             kwargs['idx_start_end'] = new_idx_start_end
-            kwargs["crawling_done"] = new_idx_start_end[-1] >= len_db_names
             crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path, use_cols=use_cols,
                                      use_all_impl_cols=use_all_impl_cols, **kwargs)
-
-    # save to csv
-    if not kwargs.get("crawling_done", False):
+        else:  # The exit of recursive crawling
+            print(f"Index >= {len_db_names}, the crawling tasks has done! idx_start_end:{idx_start_end}.")
+            # save to csv
+            shutil.copyfile(temp_save_path, save_path)
+            print(save_path, 'saved!')
+            return STATE_OK
+    else:
+        # save to csv
         df_dbms_infos.to_csv(save_path, encoding='utf-8', index=False)
         print(save_path, 'saved!')
     return STATE_OK

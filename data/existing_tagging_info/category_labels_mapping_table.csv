@@ -9,6 +9,6 @@ RDF,Triplestore (RDF)
 Relational,Relational
 Wide column,Column Family
 "Object oriented,Relational",Object-Relational
-Array,Array / Matrix
+Array,Array / Matrix / Vector
 Network,Network
 Hierarchical,Hierarchical
