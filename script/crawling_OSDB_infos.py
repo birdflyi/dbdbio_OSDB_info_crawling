@@ -48,12 +48,25 @@ def process_delimeter(s):
     return s
 
 
+def decode_email(encoded_email):
+    e = ''
+    r = int(encoded_email[0:2], 16) | 0
+    n = 2
+    while len(encoded_email) > n:
+        e += '%' + "%0.2x" % (int(encoded_email[n:n + 2], 16) ^ r)
+        n += 2
+
+    return urllib.parse.unquote(e, encoding='utf-8')
+
+
 def crawling_dbms_info_soup(url_init, header, use_elem_dict, **kwargs):
     socket.setdefaulttimeout(60)
     request = urllib.request.Request(url_init, headers=header)
     response = urllib.request.urlopen(request, timeout=10)
     response_body = response.read().decode('utf-8').replace('&shy;', '')
     response.close()  # 注意关闭response
+    re_email = re.compile(r'<span class="__cf_email__" data-cfemail="([0-9a-f]+)">\[email[^<>]+protected\]</span>')
+    response_body = re.sub(re_email, lambda s: decode_email(s[1]), response_body, re.I)
     soup = BeautifulSoup(response_body, 'lxml')  # 利用bs4库解析html
 
     # 取出主内容
@@ -370,7 +383,7 @@ def get_github_owner_repo(series):
 
 
 if __name__ == '__main__':
-    month_yyyyMM = "202301"
+    month_yyyyMM = "202306"
     OSDB_crawling_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_crawling_{month_yyyyMM}_raw.csv')
     OSDB_info_crawling_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_info_crawling_{month_yyyyMM}_raw.csv')
 
