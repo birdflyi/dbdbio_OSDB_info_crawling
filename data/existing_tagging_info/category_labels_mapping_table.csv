@@ -8,6 +8,7 @@ Object oriented,Object-Oriented
 RDF,Triplestore (RDF)
 Relational,Relational
 Wide column,Column Family
+Wide column,Column Family / Wide-Column
 "Object oriented,Relational",Object-Relational
 Array,Array / Matrix / Vector
 Network,Network
