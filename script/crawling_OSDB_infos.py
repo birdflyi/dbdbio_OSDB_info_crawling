@@ -278,7 +278,8 @@ def validate_label_mapping_table(str_series, k_v_colnames=None, mapping_table_pa
     # validate
     for e in elem_set_sorted:
         if e not in list(category_name_col):
-            raise KeyError(f"The key {e} must be in category_name_col: \n{category_name_col} ")
+            raise KeyError(f"The key '{e}' must be in category_name_col: {list(category_name_col)}. "
+                           f"Check the category_name column in {mapping_table_path}!")
     raw_df_k_v_cols = df_category_labels_mapping_table[k_v_colnames]
 
     def merge2dict_df_k_v_cols(df, k_colname, v_colname):
