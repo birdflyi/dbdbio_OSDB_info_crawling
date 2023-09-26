@@ -12,9 +12,7 @@ Wide column,Column Family
 Wide column,Column Family / Wide-Column
 "Object oriented,Relational",Object-Relational
 Array,Array
-Array,Matrix
-Array,Vector
 Array,Array / Matrix
-Array,Array / Matrix / Vector
+Vector,Vector
 Network,Network
 Hierarchical,Hierarchical
