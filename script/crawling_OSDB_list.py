@@ -59,8 +59,8 @@ def crawling_OSDB_list_soup(url_init, header, use_elem_dict, save_path, **kwargs
 
         card_header = card_title_elem.find('div', attrs={"class": "card-header"})
         card_img = card_header.find_all('img')[0]
-        if "card-img-placeholder" in card_img.attrs["class"]:
-            card_img_href = card_img.attrs["data-src"] if url_root is None else url_root + card_img.attrs["data-src"]
+        if "card-logo" in card_img.attrs["class"]:
+            card_img_href = card_img.attrs["src"] if url_root is None else url_root + card_img.attrs["src"]
         else:
             card_img_href = ""
 
