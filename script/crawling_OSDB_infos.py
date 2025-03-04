@@ -23,7 +23,6 @@ if pkg_rootdir not in sys.path:  # 解决ipynb引用上层路径中的模块时�
 import bs4
 import re
 import shutil
-import socket
 import time
 import urllib
 
@@ -60,9 +59,8 @@ def decode_email(encoded_email):
 
 
 def crawling_dbms_info_soup(url_init, header, use_elem_dict, **kwargs):
-    socket.setdefaulttimeout(60)
     request = urllib.request.Request(url_init, headers=header)
-    response = urllib.request.urlopen(request, timeout=10)
+    response = urllib.request.urlopen(request, timeout=60*5)
     response_body = response.read().decode('utf-8').replace('&shy;', '')
     response.close()  # 注意关闭response
     re_email = re.compile(r'<span class="__cf_email__" data-cfemail="([0-9a-f]+)">\[email[^<>]+protected\]</span>')
@@ -228,7 +226,7 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
             df_dbms_infos[db_name_urn] = series_dbms_info
         else:
             print(f"Unmatched dbms name, expect {db_name_urn} but get {crawling_db_name} please check the website: {url}")
-        time.sleep(0.5)
+        time.sleep(1)
         # break
 
     df_dbms_infos = df_dbms_infos.T
