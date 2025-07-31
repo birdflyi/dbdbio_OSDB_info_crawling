@@ -36,22 +36,22 @@ RECALC_OSDB_LIST = True  # Add "Name" column
 RECALC_OSDB_INFO = True  # Check "Name" column; Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
 JOIN_OSDB_SUMMARY_INFO_ON_NAME = True  # join OSDB summary and OSDB_infos on filed 'Name' and 'Name'
 
-month_yyyyMM = "202505"
+month_yyyyMM = "202507"
 
 
-def get_last_month_yyyyMM(curr_month_yyyyMM):
+def get_last_month_yyyyMM(curr_month_yyyyMM, interval=1):
     curr_month_yyyyMM = str(curr_month_yyyyMM)
     assert(curr_month_yyyyMM.isdecimal() and len(curr_month_yyyyMM) == 6)
-    import datetime
+    from datetime import datetime
+    from dateutil.relativedelta import relativedelta
 
-    curr_year = int(month_yyyyMM[:4])
-    curr_month = int(month_yyyyMM[4:6])
-    curr_month_datetime = datetime.datetime(curr_year, curr_month, 1)  # first day of current month
-    last_month_datetime = curr_month_datetime - datetime.timedelta(days=1)  # last day of last month
-    return last_month_datetime.strftime("%Y%m")
+    curr_date_obj = datetime.strptime(curr_month_yyyyMM, '%Y%m')
+    int_months_ago = curr_date_obj - relativedelta(months=interval)
+    return int_months_ago.strftime("%Y%m")
 
 
 last_month_yyyyMM = get_last_month_yyyyMM(month_yyyyMM)
+# last_month_yyyyMM = get_last_month_yyyyMM(last_month_yyyyMM)
 src_OSDB_info_joined_last_month_manulabeled_path = os.path.join(pkg_rootdir, f'data/manulabeled/OSDB_info_{last_month_yyyyMM}_joined_manulabeled.csv')
 OSDB_crawling_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_crawling_{month_yyyyMM}_raw.csv')
 OSDB_info_crawling_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_info_crawling_{month_yyyyMM}_raw.csv')
