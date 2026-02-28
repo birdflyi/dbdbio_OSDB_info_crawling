@@ -36,7 +36,7 @@ RECALC_OSDB_LIST = True  # Add "Name" column
 RECALC_OSDB_INFO = True  # Check "Name" column; Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
 JOIN_OSDB_SUMMARY_INFO_ON_NAME = True  # join OSDB summary and OSDB_infos on filed 'Name' and 'Name'
 
-month_YYYYmm = "202601"
+month_YYYYmm = "202602"
 
 
 def get_last_month_YYYYmm(curr_month_YYYYmm, interval=1):
