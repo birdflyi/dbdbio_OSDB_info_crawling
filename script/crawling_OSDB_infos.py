@@ -15,8 +15,8 @@ if '__file__' not in globals():
     nb_path = ipynbname.path()
     __file__ = str(nb_path)
 cur_dir = os.path.dirname(__file__)
-pkg_rootdir = os.path.dirname(cur_dir)  # os.path.dirname()向上一级，注意要对应工程root路径
-if pkg_rootdir not in sys.path:  # 解决ipynb引用上层路径中的模块时的ModuleNotFoundError问题
+pkg_rootdir = os.path.dirname(cur_dir)
+if pkg_rootdir not in sys.path:
     sys.path.append(pkg_rootdir)
     print('Add root directory "{}" to system path.'.format(pkg_rootdir))
 
@@ -25,6 +25,8 @@ import re
 import shutil
 import time
 import urllib
+import urllib.parse
+import urllib.request
 
 import pandas as pd
 
@@ -37,14 +39,16 @@ STATE_OK = 0
 KEY_ATTR_NAME = 'Name'
 
 def process_delimeter(s):
+    s = "" if s is None else str(s)
     # new line
     s = re.sub(r'\r?\n', ' ', s)
     s = re.sub(r'\r', ' ', s)
 
     # deduplicate
     s = re.sub(r'\s+', ' ', s)
-    s = re.sub(r'(\s*,+)+', ',', s)
-    return s
+    s = re.sub(r'\s+,\s*', ',', s)
+    s = re.sub(r',+', ',', s)
+    return s.strip(' ,')
 
 
 def decode_email(encoded_email):
@@ -58,27 +62,259 @@ def decode_email(encoded_email):
     return urllib.parse.unquote(e, encoding='utf-8')
 
 
-def crawling_dbms_info_soup(url_init, header, use_elem_dict, **kwargs):
+EMPTY_VALUE_TEXTS = {"", "-", "--", "\u2014", "\u2013", "N/A", "n/a", "None", "none", "nan"}
+INFO_ATTR_NAME_ALIASES_PATH = os.path.join(
+    pkg_rootdir, "data", "existing_tagging_info", "dbdbio_info_attr_name_aliases.csv"
+)
+DEFAULT_INFO_ATTR_NAME_ALIASES = {
+    "Blog": "Blog URL",
+    "Coding Agents": "Coding Agent",
+    "Developers": "Developer",
+    "Embedded": "Embeds / Uses",
+    "Former Names": "Former Name",
+    "License": "Licenses",
+    "Licenses": "Licenses",
+    "Operating System": "Operating Systems",
+    "Operating Systems": "Operating Systems",
+    "Project Types": "Project Type",
+    "Project Type": "Project Type",
+    "Source Code": "Source Code",
+    "Source Repo URL": "Source Code",
+    "Supported Languages": "Supported Languages",
+    "Supported languages": "Supported Languages",
+    "Written in": "Programming Language",
+    "Documentation": "Documentation",
+    "Tech Docs": "Documentation",
+    "Website": "Website URL",
+    "Wikipedia": "Wikipedia URL",
+}
+INFO_COMPAT_COLUMN_PAIRS = [
+    ("Website URL", "Website"),
+    ("Documentation", "Tech Docs"),
+    ("Programming Language", "Written in"),
+    ("Supported Languages", "Supported languages"),
+    ("Wikipedia URL", "Wikipedia"),
+]
+CONTROLLED_SECTION_ATTR_NAMES = {
+    "Acquired By",
+    "Checkpoints",
+    "Compatible With",
+    "Compression",
+    "Concurrency Control",
+    "Data Model",
+    "Derived From",
+    "Embeds / Uses",
+    "Foreign Keys",
+    "Indexes",
+    "Inspired By",
+    "Isolation Levels",
+    "Joins",
+    "Logging",
+    "Parallel Execution",
+    "Query Compilation",
+    "Query Execution",
+    "Query Interface",
+    "Storage Architecture",
+    "Storage Format",
+    "Storage Model",
+    "Storage Organization",
+    "Stored Procedures",
+    "System Architecture",
+    "Views",
+}
+
+
+def load_info_attr_name_aliases(mapping_table_path=None, encoding="utf-8"):
+    mapping_table_path = mapping_table_path or INFO_ATTR_NAME_ALIASES_PATH
+    aliases = dict(DEFAULT_INFO_ATTR_NAME_ALIASES)
+    try:
+        df_aliases = pd.read_csv(mapping_table_path, encoding=encoding, index_col=False)
+    except FileNotFoundError:
+        return aliases
+
+    for _, row in df_aliases.iterrows():
+        attr_name = process_delimeter(row.get("attr_name", ""))
+        canonical_attr_name = process_delimeter(row.get("canonical_attr_name", ""))
+        if attr_name and canonical_attr_name:
+            aliases[attr_name] = canonical_attr_name
+    return aliases
+
+
+INFO_ATTR_NAME_ALIASES = load_info_attr_name_aliases()
+INFO_ATTR_CANONICAL_NAMES = set(INFO_ATTR_NAME_ALIASES.values())
+
+
+def normalize_info_attr_name(s):
+    s = process_delimeter(s)
+    s = re.sub(r'(\s*\[\d+\])+', '', s).strip()
+    if s in INFO_ATTR_NAME_ALIASES:
+        return INFO_ATTR_NAME_ALIASES[s]
+    if s in INFO_ATTR_CANONICAL_NAMES:
+        return s
+    return s
+
+
+def add_info_compat_attrs(attrs_dict):
+    for canonical_col, legacy_col in INFO_COMPAT_COLUMN_PAIRS:
+        canonical_value = attrs_dict.get(canonical_col)
+        legacy_value = attrs_dict.get(legacy_col)
+        if (legacy_col not in attrs_dict or is_empty_info_value(legacy_value)) and not is_empty_info_value(canonical_value):
+            attrs_dict[legacy_col] = canonical_value
+        if (canonical_col not in attrs_dict or is_empty_info_value(canonical_value)) and not is_empty_info_value(legacy_value):
+            attrs_dict[canonical_col] = legacy_value
+    return attrs_dict
+
+
+def ensure_info_compat_columns(df):
+    df = pd.DataFrame(df).copy()
+    for canonical_col, legacy_col in INFO_COMPAT_COLUMN_PAIRS:
+        if canonical_col in df.columns and legacy_col not in df.columns:
+            df[legacy_col] = df[canonical_col]
+        if legacy_col in df.columns and canonical_col not in df.columns:
+            df[canonical_col] = df[legacy_col]
+    return df
+
+
+def is_empty_info_value(s):
+    return process_delimeter(s) in EMPTY_VALUE_TEXTS
+
+
+def clean_info_element_text(elem, separator=' '):
+    if elem is None:
+        return ""
+    elem_soup = BeautifulSoup(str(elem), 'lxml')
+    for drop_elem in elem_soup.select(".cites, .citation, time, .text-muted, script, style"):
+        drop_elem.decompose()
+    return process_delimeter(elem_soup.get_text(separator, strip=True))
+
+
+def extract_info_value(elem):
+    if elem is None:
+        return ""
+
+    value_parts = []
+    for link in elem.find_all("a"):
+        link_classes = link.attrs.get("class", [])
+        if "citation" in link_classes:
+            continue
+        link_text = clean_info_element_text(link)
+        if link_text and not is_empty_info_value(link_text):
+            value_parts.append(link_text)
+
+    if value_parts:
+        return process_delimeter(",".join(value_parts))
+
+    value = clean_info_element_text(elem)
+    return "" if is_empty_info_value(value) else value
+
+
+def merge_info_attr_value(attrs_dict, key, value):
+    value = process_delimeter(value)
+    if not key or is_empty_info_value(value):
+        return
+    if key not in attrs_dict or pd.isna(attrs_dict[key]) or is_empty_info_value(attrs_dict[key]):
+        attrs_dict[key] = value
+        return
+    old_value = process_delimeter(attrs_dict[key])
+    if old_value == value:
+        return
+
+    merged_values = []
+    for item in (old_value + "," + value).split(","):
+        item = process_delimeter(item)
+        if item and item not in merged_values:
+            merged_values.append(item)
+    attrs_dict[key] = ",".join(merged_values)
+
+
+def parse_modern_dbms_info_soup(soup, preset_dict=None):
+    entry_main = soup.select_one("main.page-system .entry-main") or soup.select_one(".entry-main")
+    if not entry_main:
+        return {}
+
+    dbms_info_record_attrs_dict = {}
+    dbms_info_record_attrs_dict.update(**(preset_dict or {}))
+
+    title_elem = (
+        entry_main.select_one(".d-none.d-md-block .page-title h1")
+        or entry_main.select_one(".page-title h1")
+        or soup.select_one("main.page-system h1")
+        or soup.find("h1")
+    )
+    if title_elem:
+        merge_info_attr_value(dbms_info_record_attrs_dict, "card_title", clean_info_element_text(title_elem))
+
+    description_elems = (
+        entry_main.select(".d-none.d-md-block .entry-lead-block")
+        or entry_main.select(".entry-lead-block")
+    )
+    description = " ".join([clean_info_element_text(e) for e in description_elems if clean_info_element_text(e)])
+    if description:
+        merge_info_attr_value(dbms_info_record_attrs_dict, "Description", description)
+
+    fact_elems = (
+        entry_main.select(".entry-sidebar dl .fact")
+        or entry_main.select("dl .fact")
+        or soup.select("main.page-system dl .fact")
+    )
+    for fact_elem in fact_elems:
+        dt_elem = fact_elem.find("dt")
+        dd_elem = fact_elem.find("dd")
+        key = normalize_info_attr_name(clean_info_element_text(dt_elem))
+        value = extract_info_value(dd_elem)
+        merge_info_attr_value(dbms_info_record_attrs_dict, key, value)
+
+    for section_elem in entry_main.select(".entry-section"):
+        title_elem = section_elem.find(["h2", "h3", "h4"])
+        key = normalize_info_attr_name(clean_info_element_text(title_elem))
+        if not key:
+            continue
+
+        badge_values = [clean_info_element_text(e) for e in section_elem.select(".badge-section")]
+        badge_values = [e for e in badge_values if e and not is_empty_info_value(e)]
+        if badge_values:
+            value = ",".join(badge_values)
+        else:
+            link_values = [extract_info_value(e) for e in section_elem.find_all("a")]
+            link_values = [e for e in link_values if e and not is_empty_info_value(e)]
+            if link_values:
+                value = ",".join(link_values)
+            elif key in CONTROLLED_SECTION_ATTR_NAMES:
+                continue
+            else:
+                section_copy = BeautifulSoup(str(section_elem), 'lxml')
+                for drop_elem in section_copy.select("h2, h3, h4, hr, .cites, .citation, time, .text-muted"):
+                    drop_elem.decompose()
+                value = process_delimeter(section_copy.get_text(" ", strip=True))
+
+        merge_info_attr_value(dbms_info_record_attrs_dict, key, value)
+
+    return add_info_compat_attrs(dbms_info_record_attrs_dict)
+
+
+def fetch_dbms_info_soup(url_init, header):
     request = urllib.request.Request(url_init, headers=header)
     response = urllib.request.urlopen(request, timeout=60*5)
     response_body = response.read().decode('utf-8').replace('&shy;', '')
-    response.close()  # 注意关闭response
+    resolved_url = response.geturl()
+    response.close()
     re_email = re.compile(r'<span class="__cf_email__" data-cfemail="([0-9a-f]+)">\[email[^<>]+protected\]</span>')
     response_body = re.sub(re_email, lambda s: decode_email(s[1]), response_body, re.I)
-    soup = BeautifulSoup(response_body, 'lxml')  # 利用bs4库解析html
+    soup = BeautifulSoup(response_body, 'lxml')
+    return soup, resolved_url
 
-    # 取出主内容
+
+def parse_legacy_dbms_info_soup(soup, use_elem_dict, preset_dict=None):
+    # Parse the legacy card layout.
     main_contents = soup.find_all(use_elem_dict['main_contents'][0], attrs=use_elem_dict['main_contents'][1])
     db_info_table = main_contents[0]
 
-    # 获取所需文本
     summary_col = db_info_table.find_all("div", {"class": "col-sm-12 col-md-7 order-2 order-md-1"})[0]
     feature_col = db_info_table.find_all("div", {"class": "col-sm-12 col-md-3 order-1 order-md-2"})[0]
 
     # parse summary_col
     dbms_info_record_attrs_dict = {}
-    preset_dict = kwargs.get("preset_dict", {})
-    dbms_info_record_attrs_dict.update(**preset_dict)
+    dbms_info_record_attrs_dict.update(**(preset_dict or {}))
     summary_divs = summary_col.find_all("div", {"class": "card"})
 
     descrips_div = summary_divs[0]
@@ -101,13 +337,12 @@ def crawling_dbms_info_soup(url_init, header, use_elem_dict, **kwargs):
         if id_str:
             card_title = summary_div.find("h4", {"class": "card-title"}).get_text(',', '<br/>').strip()
             card_text = summary_div.find("p", {"class": "card-text"}).get_text(',', '<br/>').strip()
-            card_title = process_delimeter(card_title)
+            card_title = normalize_info_attr_name(card_title)
             card_text = process_delimeter(card_text)
-            dbms_info_record_attrs_dict[card_title] = card_text
+            merge_info_attr_value(dbms_info_record_attrs_dict, card_title, card_text)
 
     # parse feature_col
     feature_div_bodys = feature_col.find("div", {"class": "card has-citations"}).find("div", {"class": "card-body"})
-    # feature_div_bodys = feature_divs
     feature_div_bodys = feature_div_bodys.contents
     card_titles = []
     card_texts = []
@@ -123,7 +358,7 @@ def crawling_dbms_info_soup(url_init, header, use_elem_dict, **kwargs):
                     card_texts.append(temp_value_full_strs)
                     temp_value_part_strs = []  # reset
                 card_title = feature_div_body.get_text(',', '<br/>').strip()
-                card_title = process_delimeter(card_title)
+                card_title = normalize_info_attr_name(card_title)
                 card_titles.append(card_title)
 
             elif feature_div_body.name == 'p':
@@ -137,9 +372,44 @@ def crawling_dbms_info_soup(url_init, header, use_elem_dict, **kwargs):
         card_texts.append(temp_value_full_strs)
         temp_value_part_strs = []
     assert(len(card_titles) == len(card_texts))
-    dbms_info_record_attrs_dict.update(**dict(zip(card_titles, card_texts)))
-    return dbms_info_record_attrs_dict
+    for card_title, card_text in zip(card_titles, card_texts):
+        merge_info_attr_value(dbms_info_record_attrs_dict, card_title, card_text)
+    return add_info_compat_attrs(dbms_info_record_attrs_dict)
 
+
+def crawling_dbms_info_soup(url_init, header, use_elem_dict, **kwargs):
+    preset_dict = kwargs.get("preset_dict", {})
+    soup, _ = fetch_dbms_info_soup(url_init, header)
+    dbms_info_record_attrs_dict = parse_modern_dbms_info_soup(soup, preset_dict=preset_dict)
+    if dbms_info_record_attrs_dict:
+        return dbms_info_record_attrs_dict
+    return parse_legacy_dbms_info_soup(soup, use_elem_dict, preset_dict=preset_dict)
+
+
+def inspect_dbms_info_soup(url_init, header, use_elem_dict=None, **kwargs):
+    preset_dict = kwargs.get("preset_dict", {})
+    try:
+        soup, resolved_url = fetch_dbms_info_soup(url_init, header)
+    except BaseException as e:
+        return {
+            "ok": False,
+            "url": url_init,
+            "resolved_url": "",
+            "attrs": {},
+            "error": f"{type(e).__name__}: {e}",
+        }
+
+    dbms_info_record_attrs_dict = parse_modern_dbms_info_soup(soup, preset_dict=preset_dict)
+    if not dbms_info_record_attrs_dict and use_elem_dict:
+        dbms_info_record_attrs_dict = parse_legacy_dbms_info_soup(soup, use_elem_dict, preset_dict=preset_dict)
+
+    return {
+        "ok": True,
+        "url": url_init,
+        "resolved_url": resolved_url,
+        "attrs": dbms_info_record_attrs_dict,
+        "error": "",
+    }
 
 def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path, use_cols=None, use_all_impl_cols=True, **kwargs):
     ADD_MODE = kwargs.get('mode', None) == 'a'
@@ -157,13 +427,16 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
             df_db_names_urls = pd.DataFrame(df_db_names_urls.items(), columns=["db_names", "urls"])
 
     default_use_cols = [KEY_ATTR_NAME, "card_title", "Description", "Data Model", "Query Interface", "System Architecture",
-                        "Website", "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year",
-                        "End Year", "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses",
-                        "Operating Systems", "Twitter", "Compression", "Storage Architecture", "Storage Model",
+                        "Website URL", "Website", "Source Code", "Documentation", "Tech Docs", "Developer",
+                        "Country of Origin", "Start Year", "End Year", "Project Type", "Programming Language",
+                        "Written in", "Supported Languages", "Supported languages", "Embeds / Uses", "Licenses",
+                        "Operating Systems", "Blog URL", "Twitter", "Wikipedia URL", "Wikipedia", "Coding Agent", "Tags",
+                        "Crawl Error",
+                        "Compression", "Storage Architecture", "Storage Model",
                         "Checkpoints", "Concurrency Control", "Foreign Keys", "Indexes", "Isolation Levels", "Joins",
                         "Logging", "Query Compilation", "Query Execution", "Stored Procedures", "Views", "Derived From",
-                        "Wikipedia", "Storage Organization", "Inspired By", "Parallel Execution", "Storage Format",
-                        "Acquired By", "Compatible With", "Former Name"]
+                        "Embedded", "Storage Organization", "Inspired By", "Parallel Execution", "Storage Format",
+                        "Acquired By", "Compatible With", "Former Name", "Governance", "Hosted Systems"]
     if use_all_impl_cols:
         use_cols = default_use_cols
         if use_cols:
@@ -208,13 +481,24 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
         db_name_urn = str(url).split('/')[-1]  # db_name_card_title may be duplicated! use db_name splited from url instead.
         print(f"{i + 1}/{len_db_names}: Crawling data for {db_name_card_title} on {url} ...")
         header = headers[i % len(headers)]
-        dbms_info_record_attrs_dict = crawling_dbms_info_soup(url, header, use_elem_dict, preset_dict={KEY_ATTR_NAME: db_name_urn})
+        try:
+            dbms_info_record_attrs_dict = crawling_dbms_info_soup(
+                url, header, use_elem_dict, preset_dict={KEY_ATTR_NAME: db_name_urn}
+            )
+        except BaseException as e:
+            error_msg = f"{type(e).__name__}: {e}"
+            print(f"Warning: failed to crawl data for {db_name_card_title} on {url}: {error_msg}")
+            dbms_info_record_attrs_dict = {
+                KEY_ATTR_NAME: db_name_urn,
+                "card_title": db_name_card_title,
+                "Crawl Error": error_msg,
+            }
         if use_all_impl_cols:
             temp_use_cols = list(dbms_info_record_attrs_dict.keys())
             use_cols.extend(e for e in temp_use_cols if e not in use_cols)
         try:
             crawling_db_name = dbms_info_record_attrs_dict[KEY_ATTR_NAME]
-        except ValueError:
+        except (KeyError, ValueError):
             print("The website dbdb.io may have changed the key attribute of DBMS system properties table! Please"
                   "update KEY_ATTR_NAME!")
             return
@@ -261,8 +545,71 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
 
 def pd_select_col(cols, src_path, tar_path, encoding="utf-8", index_col=False, **kwargs):
     df = pd.read_csv(src_path, encoding=encoding, index_col=index_col, **kwargs)
+    df = ensure_info_compat_columns(df)
+    for col in cols:
+        if col not in df.columns:
+            df[col] = pd.NA
     df[cols].to_csv(tar_path, encoding=encoding, index=index_col)
     return
+
+
+def is_probable_prose_category_noise(item, full_value):
+    item = process_delimeter(item)
+    full_value = process_delimeter(full_value)
+    return (
+        len(full_value) > 120
+        or "." in full_value
+        or "(" in item
+        or ")" in item
+        or len(item.split()) > 4
+    )
+
+
+def clean_category_value_series(str_series, mapping_table_path=None, encoding="utf-8", index_col=False):
+    mapping_table_path = mapping_table_path or os.path.join(
+        pkg_rootdir, 'data/existing_tagging_info/category_labels_mapping_table.csv'
+    )
+    df_category_labels_mapping_table = pd.read_csv(mapping_table_path, encoding=encoding, index_col=index_col)
+    valid_category_names = set(df_category_labels_mapping_table["category_name"].dropna().astype(str))
+    dropped_noise_values = []
+    strict_unknown_values = []
+
+    def clean_one(value):
+        if pd.isna(value):
+            return value
+        value = process_delimeter(value)
+        if not value:
+            return pd.NA
+
+        kept_items = []
+        for item in value.split(","):
+            item = process_delimeter(item)
+            if not item:
+                continue
+            if item in valid_category_names:
+                kept_items.append(item)
+            elif is_probable_prose_category_noise(item, value):
+                dropped_noise_values.append(item)
+            else:
+                strict_unknown_values.append(item)
+
+        if kept_items:
+            return ",".join(kept_items)
+        if value and all(is_probable_prose_category_noise(item, value) for item in value.split(",")):
+            return pd.NA
+        return value
+
+    cleaned_series = pd.Series(str_series).apply(clean_one)
+    if dropped_noise_values:
+        dropped_noise_values = sorted(set(dropped_noise_values))
+        print(f"Warning: dropped probable prose noise from category values: {dropped_noise_values[:20]}")
+    if strict_unknown_values:
+        strict_unknown_values = sorted(set(strict_unknown_values))
+        raise KeyError(
+            f"Unknown category values need mapping maintenance: {strict_unknown_values}. "
+            f"Check the category_name column in {mapping_table_path}!"
+        )
+    return cleaned_series
 
 
 def validate_label_mapping_table(str_series, k_v_colnames=None, mapping_table_path=None, encoding="utf-8", index_col=False):
@@ -321,21 +668,31 @@ def mapping_values2labels(item, **kwargs):
         return ",".join(flatten_item_list_dedup)
 
 
-def recalc_OSDB_info(path, encoding="utf-8", index_col=False):
+def recalc_OSDB_info(path, encoding="utf-8", index_col=False, check_github_response=False):
     df_dbms_infos = pd.read_csv(path, encoding=encoding, index_col=index_col)
+    df_dbms_infos = ensure_info_compat_columns(df_dbms_infos)
+    for col in ["Data Model", "Website", "Source Code", "Project Type", "Licenses", "Start Year", "End Year"]:
+        if col not in df_dbms_infos.columns:
+            df_dbms_infos[col] = pd.NA
+    if "Data Model" in df_dbms_infos.columns:
+        df_dbms_infos["Data Model"] = clean_category_value_series(
+            df_dbms_infos["Data Model"], encoding=encoding, index_col=index_col
+        )
     to_int_str = lambda x: "" if pd.isna(x) else str(int(x))
     recalc_func_dict = {
         KEY_ATTR_NAME: {"validate_func": ValidateFunc.check_distinct},
         # Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
         "Data_Model_mapping": {"apply_param_preprocess_func": validate_label_mapping_table, "apply_func": mapping_values2labels, "input_col": "Data Model"},
-        "has_github_repo": {"apply_func": lambda x: "Y" if ValidateFunc.has_github_repo(x) else "",
+        "has_github_repo": {"apply_func": lambda x: "Y" if ValidateFunc.has_github_repo(
+            x, check_response=check_github_response) else "",
                                         "input_col": ["Website", "Source Code"], "apply_param_preprocess_func": lambda x: {"axis": 1}},  # need to be labeled manually
-        "github_repo_link": {"apply_func": lambda x: get_github_owner_repo(x), "input_col": ["Website", "Source Code"],
+        "github_repo_link": {"apply_func": lambda x: get_github_owner_repo(
+            x, check_response=check_github_response), "input_col": ["Website", "Source Code"],
                              "apply_param_preprocess_func": lambda x: {"axis": 1}},  # need to be labeled manually
         "org_name": {"apply_func": lambda x: x.split("/")[0] if x else "", "input_col": "github_repo_link"},
         "repo_name": {"apply_func": lambda x: x.split("/")[1] if len(x.split("/")) > 1 else "", "input_col": "github_repo_link"},
         "open_source_license": {
-            "apply_func": lambda x: "Y" if ValidateFunc.check_open_source_license(x, strict=True) else "",
+            "apply_func": lambda x: "Y" if ValidateFunc.check_open_source_license(x, strict=False) else "",
             "input_col": ["Project Type", "Website", "Source Code", "Licenses"],
             "apply_param_preprocess_func": lambda x: {"axis": 1}},
         "Start Year": {"apply_func": to_int_str},
@@ -361,10 +718,12 @@ def recalc_OSDB_info(path, encoding="utf-8", index_col=False):
     return None
 
 
-def get_github_owner_repo(series):
+def get_github_owner_repo(series, check_response=False):
     series = pd.Series(series)
     get_github_owner_repo_from_github_website = lambda x: '/'.join(
-        x.replace("https://github.com/", "").split("/")[:2]) if ValidateFunc.is_from_github(x) else ""
+        ValidateFunc.normalize_github_repo_url(x).replace("https://github.com/", "").split("/")[:2]
+    ) if (ValidateFunc.is_from_github(x) and
+          ValidateFunc.github_repo_url_exists(x, check_response=check_response)) else ""
     col__website = "Website"
     col__source_code = "Source Code"
     has_github_repo_colnames = [col__website, col__source_code]
@@ -420,7 +779,8 @@ if __name__ == '__main__':
                              temp_save_path=temp_save_path, batch=batch)
     use_cols = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
                 "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year", "End Year",
-                "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses", "Operating Systems"]
+                "Project Type", "Written in", "Supported Languages", "Supported languages", "Embeds / Uses",
+                "Licenses", "Operating Systems", "Crawl Error"]
     pd_select_col(use_cols, temp_save_path, OSDB_info_crawling_path)
 
     recalc_OSDB_info(path=OSDB_info_crawling_path)

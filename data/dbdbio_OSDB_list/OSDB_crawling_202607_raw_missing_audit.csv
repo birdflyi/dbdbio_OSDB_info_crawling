@@ -1,0 +1,8 @@
+Name,card_title_href,resolved_url,page_ok,resolved_url_in_current,Project Type,Licenses,project_type_has_open_source,license_has_open_source,rescued,error
+antdb,https://dbdb.io/db/antdb,https://dbdb.io/db/antdb,True,False,Commercial,Apache v2,False,True,True,
+event-store,https://dbdb.io/db/event-store,https://dbdb.io/db/kurrentdb,True,True,"Commercial,Open Source",BSD License,True,True,False,
+genji,https://dbdb.io/db/genji,,False,False,,,False,False,False,HTTPError: HTTP Error 404: Not Found
+pocketsql,https://dbdb.io/db/pocketsql,https://dbdb.io/db/pocketsql,True,False,,GPL v2,False,True,True,
+resin-cache,https://dbdb.io/db/resin-cache,https://dbdb.io/db/resin-cache,True,False,Commercial,Proprietary,False,False,False,
+voltdb,https://dbdb.io/db/voltdb,https://dbdb.io/db/voltdb,True,False,Commercial,"GPL v3,Proprietary,VoltDB Proprietary License",False,True,True,
+xap,https://dbdb.io/db/xap,https://dbdb.io/db/xap,True,False,Commercial,Proprietary,False,False,False,

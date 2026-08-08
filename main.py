@@ -25,7 +25,7 @@ if pkg_rootdir not in sys.path:  # 解决ipynb引用上层路径中的模块时�
 
 import pandas as pd
 
-from script.crawling_OSDB_list import crawling_OSDB_list_soup, recalc_OSDB_list
+from script.crawling_OSDB_list import crawling_OSDB_list_soup, recalc_OSDB_list, rescue_missing_open_source_records
 from script.crawling_OSDB_infos import crawling_OSDB_infos_soup, pd_select_col, recalc_OSDB_info
 from script.db_info_fusion import merge_info_start_checkpoint_last_month_manulabeled
 from script.join_OSDB_list_OSDB_info import join_OSDB_list_OSDB_info
@@ -36,7 +36,7 @@ RECALC_OSDB_LIST = True  # Add "Name" column
 RECALC_OSDB_INFO = True  # Check "Name" column; Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
 JOIN_OSDB_SUMMARY_INFO_ON_NAME = True  # join OSDB summary and OSDB_infos on filed 'Name' and 'Name'
 
-month_YYYYmm = "202606"
+month_YYYYmm = "202607"
 
 
 def get_last_month_YYYYmm(curr_month_YYYYmm, interval=1):
@@ -53,6 +53,7 @@ def get_last_month_YYYYmm(curr_month_YYYYmm, interval=1):
 last_month_YYYYmm = get_last_month_YYYYmm(month_YYYYmm)
 # last_month_YYYYmm = get_last_month_YYYYmm(last_month_YYYYmm)
 src_OSDB_info_joined_last_month_manulabeled_path = os.path.join(pkg_rootdir, f'data/manulabeled/OSDB_info_{last_month_YYYYmm}_joined_manulabeled.csv')
+src_OSDB_crawling_last_month_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_crawling_{last_month_YYYYmm}_raw.csv')
 OSDB_crawling_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_crawling_{month_YYYYmm}_raw.csv')
 OSDB_info_crawling_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_info_crawling_{month_YYYYmm}_raw.csv')
 OSDB_info_joined_path = os.path.join(pkg_rootdir, f'data/dbdbio_OSDB_list/OSDB_info_{month_YYYYmm}_joined.csv')
@@ -81,10 +82,10 @@ if __name__ == '__main__':
 
     if UPDATE_OSDB_LIST:
         # dbdb.io http link
-        # - use "https://dbdb.io/browse?type=open-source" to get all the open source databases in dbdb.io
+        # - use "https://dbdb.io/browse?project-type=open-source" to get all the open source databases in dbdb.io
         # - use "https://dbdb.io/browse?q=*" to get all the databases in dbdb.io
         dbdbio_url = "https://dbdb.io"
-        dbdbio_OSDB_url = dbdbio_url + "/browse?type=open-source"
+        dbdbio_OSDB_url = dbdbio_url + "/browse?project-type=open-source"
         url_init = dbdbio_OSDB_url
         use_elem_dict = {
             'main_contents': ['form', {'id': 'mainsearch'}],
@@ -92,6 +93,9 @@ if __name__ == '__main__':
         crawling_OSDB_list_soup(url_init, headers[0], use_elem_dict, save_path=OSDB_crawling_path, url_root=dbdbio_url)
     if RECALC_OSDB_LIST:
         recalc_OSDB_list(path=OSDB_crawling_path)
+    if UPDATE_OSDB_LIST:
+        rescue_missing_open_source_records(OSDB_crawling_path, src_OSDB_crawling_last_month_path, headers,
+                                           sleep_seconds=1)
 
     if UPDATE_OSDB_INFO:
         df_OSDB_table = pd.read_csv(OSDB_crawling_path, encoding=encoding, index_col=False)
@@ -109,10 +113,17 @@ if __name__ == '__main__':
         crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path=OSDB_info_crawling_path, mode=mode,
                                  temp_save_path=temp_save_path, batch=batch)
 
-        use_cols = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture", "Website",
-                    "Source Code", "Tech Docs", "Developer", "Country of Origin", "Start Year", "End Year",
-                    "Project Type", "Written in", "Supported languages", "Embeds / Uses", "Licenses",
-                    "Operating Systems"]
+        use_cols = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture",
+                    "Website URL", "Website", "Source Code", "Documentation", "Tech Docs", "Developer",
+                    "Country of Origin", "Start Year", "End Year", "Project Type", "Programming Language",
+                    "Written in", "Supported Languages", "Supported languages", "Embeds / Uses", "Licenses",
+                    "Operating Systems", "Blog URL", "Twitter", "Wikipedia URL", "Wikipedia", "Coding Agent", "Tags",
+                    "Crawl Error",
+                    "Compression", "Storage Architecture", "Storage Model", "Checkpoints", "Concurrency Control",
+                    "Foreign Keys", "Indexes", "Isolation Levels", "Joins", "Logging", "Query Compilation",
+                    "Query Execution", "Stored Procedures", "Views", "Derived From", "Embedded",
+                    "Storage Organization", "Inspired By", "Parallel Execution", "Storage Format", "Acquired By",
+                    "Compatible With", "Former Name", "Governance", "Hosted Systems"]
         pd_select_col(use_cols, temp_save_path, OSDB_info_crawling_path)
 
     if RECALC_OSDB_INFO:

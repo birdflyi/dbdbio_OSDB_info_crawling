@@ -4,6 +4,7 @@ Document,Document / XML
 Graph,Entity-Relationship
 Graph,Graph
 Key-value,Key/Value
+Key-value,Key-Value
 Multivalue,Multi-Value
 Object oriented,Object-Oriented
 RDF,Triplestore (RDF)

@@ -22,12 +22,19 @@ if pkg_rootdir not in sys.path:  # 解决ipynb引用上层路径中的模块时�
     print('-- Add root directory "{}" to system path.'.format(pkg_rootdir))
 
 import re
+import urllib.error
+import urllib.parse
+import urllib.request
 
 import pandas as pd
 
-from collections import Iterable
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 
 class ValidateFunc:
+    _github_url_exists_cache = {}
 
     def __init__(self):
         pass
@@ -51,6 +58,44 @@ class ValidateFunc:
     @staticmethod
     def is_from_github(x):
         return False if pd.isna(x) else str(x).startswith("https://github.com/")
+
+    @staticmethod
+    def normalize_github_repo_url(x):
+        if pd.isna(x):
+            return ""
+        x = str(x).strip()
+        if ValidateFunc.is_from_github(x):
+            split_url = urllib.parse.urlsplit(x)
+            path_parts = [e for e in split_url.path.split("/") if e]
+        elif "://" not in x:
+            path_parts = [e for e in x.strip("/").split("/") if e]
+        else:
+            return ""
+        if len(path_parts) < 2:
+            return ""
+        return urllib.parse.urlunsplit(("https", "github.com", "/" + "/".join(path_parts[:2]), "", ""))
+
+    @staticmethod
+    def github_repo_url_exists(x, timeout=10, check_response=False):
+        repo_url = ValidateFunc.normalize_github_repo_url(x)
+        if not repo_url:
+            return False
+        if not check_response:
+            return True
+        if repo_url in ValidateFunc._github_url_exists_cache:
+            return ValidateFunc._github_url_exists_cache[repo_url]
+
+        request = urllib.request.Request(repo_url, headers={"User-Agent": "Mozilla/5.0"}, method="HEAD")
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                flag = 200 <= response.status < 400
+        except urllib.error.HTTPError as e:
+            flag = False if e.code == 404 else True
+        except urllib.error.URLError:
+            flag = True
+
+        ValidateFunc._github_url_exists_cache[repo_url] = flag
+        return flag
 
     @staticmethod
     def is_from_common_opensource_platforms(x):
@@ -155,17 +200,20 @@ class ValidateFunc:
     @staticmethod
     def check_open_source_license(series, strict=False):
         series = pd.Series(series)
+        col__project_tpye = "Project Type"
+        flag_project_type_open_source = bool(
+            re.findall("open source", str(series.get(col__project_tpye, "")).lower())
+        )
+        flag_has_open_source_link = ValidateFunc.has_open_source_link(series, check_response=False)
+        flag_common_open_source_licenses_valid = ValidateFunc.common_open_source_licenses_valid(series)
         if not strict:
-            col__project_tpye = "Project Type"
-            flag = True if re.findall("open source", str(series[col__project_tpye]).lower()) else False
+            flag = flag_project_type_open_source or flag_has_open_source_link or flag_common_open_source_licenses_valid
         else:
-            flag_has_open_source_link = ValidateFunc.has_open_source_link(series)
-            flag_common_open_source_licenses_valid = ValidateFunc.common_open_source_licenses_valid(series)
             flag = flag_has_open_source_link or flag_common_open_source_licenses_valid
         return flag
 
     @staticmethod
-    def has_github_repo(series):
+    def has_github_repo(series, check_response=False):
         flag = False
         series = pd.Series(series)
         col__website = "Website"
@@ -177,26 +225,36 @@ class ValidateFunc:
                 temp_has_github_repo_colnames.append(c)
         if len(temp_has_github_repo_colnames):
             for c in temp_has_github_repo_colnames:
-                if ValidateFunc.is_from_github(series[c]):
+                if (ValidateFunc.is_from_github(series[c]) and
+                        ValidateFunc.github_repo_url_exists(series[c], check_response=check_response)):
                     flag = True
                     break
         return flag
 
     @staticmethod
-    def has_open_source_link(series):
+    def has_open_source_link(series, check_response=False):
         flag = False
         series = pd.Series(series)
         col__website = "Website"
         col__source_code = "Source Code"
-        has_github_repo_colnames = [col__website, col__source_code]
+        has_github_repo_colnames = [c for c in [col__website, col__source_code] if c in series.index.values]
         defaut_use_col = col__source_code
-        if pd.notna(series[defaut_use_col]):
-            flag = True
+        if defaut_use_col in series.index.values and pd.notna(series[defaut_use_col]):
+            source_code_url = series[defaut_use_col]
+            flag = (
+                ValidateFunc.github_repo_url_exists(source_code_url, check_response=check_response)
+                if ValidateFunc.is_from_github(source_code_url)
+                else True
+            )
         else:
-            has_github_repo_colnames.remove(defaut_use_col)
+            if defaut_use_col in has_github_repo_colnames:
+                has_github_repo_colnames.remove(defaut_use_col)
             for c in has_github_repo_colnames:
-                if ValidateFunc.is_from_common_opensource_platforms(series[c]):
+                if ValidateFunc.is_from_github(series[c]):
+                    flag = ValidateFunc.github_repo_url_exists(series[c], check_response=check_response)
+                elif ValidateFunc.is_from_common_opensource_platforms(series[c]):
                     flag = True
+                if flag:
                     break
         return flag
 
