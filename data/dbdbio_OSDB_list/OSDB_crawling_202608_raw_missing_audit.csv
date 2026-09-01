@@ -1,0 +1,4 @@
+Name,card_title_href,resolved_url,page_ok,resolved_url_in_current,Project Type,Licenses,project_type_has_open_source,license_has_open_source,rescued,error
+antdb,https://dbdb.io/db/antdb,https://dbdb.io/db/antdb,True,False,Commercial,Apache v2,False,True,True,
+pocketsql,https://dbdb.io/db/pocketsql,https://dbdb.io/db/pocketsql,True,False,,GPL v2,False,True,True,
+voltdb,https://dbdb.io/db/voltdb,https://dbdb.io/db/voltdb,True,False,Commercial,"GPL v3,Proprietary,VoltDB Proprietary License",False,True,True,
