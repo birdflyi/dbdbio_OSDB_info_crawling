@@ -26,6 +26,9 @@ if pkg_rootdir not in sys.path:
     print('Add root directory "{}" to system path.'.format(pkg_rootdir))
 
 
+from script.http_fetch import fetch_html, fetch_options
+
+
 DEFAULT_OSDB_BROWSE_FILTER = "project-type=open-source"
 LEGACY_OSDB_BROWSE_FILTER = "type=open-source"
 DB_COLUMN_NAMES = ["card_title", "card_title_href", "card_img_href", "card_text"]
@@ -151,11 +154,8 @@ def _parse_browse_table_rows(soup, main_search, url_root=None):
 
 def crawling_OSDB_list_soup(url_init, header, use_elem_dict, save_path, **kwargs):
     url_init = normalize_osdb_browse_url(url_init)
-    request = urllib.request.Request(url_init, headers=header)
-    response = urllib.request.urlopen(request)
-    response_body = response.read().decode('utf-8', errors='replace')
+    response_body, _ = fetch_html(url_init, header, **fetch_options(kwargs))
     soup = BeautifulSoup(response_body, 'lxml')
-    response.close()
 
     main_contents = soup.find_all(use_elem_dict['main_contents'][0], attrs=use_elem_dict['main_contents'][1])
     main_search = main_contents[0] if main_contents else soup
@@ -170,10 +170,10 @@ def crawling_OSDB_list_soup(url_init, header, use_elem_dict, save_path, **kwargs
         if results_info:
             print(results_info)
         osdb_records = _parse_legacy_card_rows(main_search, url_root=url_root)
-        if results_info and str(len(osdb_records)) not in results_info:
-            print(f"Error: Wrong length of card body, get len(osdb_records) = {len(osdb_records)}, "
-                  f"while it cannot be found in results_info: '{results_info}'!")
-            return
+        if results_info:
+            count_match = re.search(r"([\d,]+)\s+(?:systems?|results?)\b", results_info, flags=re.I)
+            if count_match and int(count_match[1].replace(",", "")) != len(osdb_records):
+                raise ValueError(f"Incomplete OSDB list: parsed {len(osdb_records)} records; {results_info}")
 
     if not osdb_records:
         raise ValueError(f"No OSDB records were parsed from {url_init}. The dbdb.io browse layout may have changed.")
@@ -241,7 +241,7 @@ def rescue_missing_open_source_records(current_list_path, last_month_list_path, 
         url = row["card_title_href"]
         header = headers[(order_id - 1) % len(headers)]
         print(f"Checking missing record {order_id}/{len(missing_df)}: {db_name} on {url} ...")
-        inspect_res = inspect_dbms_info_soup(url, header, preset_dict={"Name": db_name})
+        inspect_res = inspect_dbms_info_soup(url, header, preset_dict={"Name": db_name}, **fetch_options(kwargs))
         attrs = inspect_res.get("attrs", {})
         project_type = attrs.get("Project Type", "")
         licenses = attrs.get("Licenses", "")

@@ -34,6 +34,7 @@ from bs4 import BeautifulSoup
 from urllib import request
 
 from script.validate import ValidateFunc
+from script.http_fetch import fetch_html, fetch_options
 
 STATE_OK = 0
 KEY_ATTR_NAME = 'Name'
@@ -292,12 +293,9 @@ def parse_modern_dbms_info_soup(soup, preset_dict=None):
     return add_info_compat_attrs(dbms_info_record_attrs_dict)
 
 
-def fetch_dbms_info_soup(url_init, header):
-    request = urllib.request.Request(url_init, headers=header)
-    response = urllib.request.urlopen(request, timeout=60*5)
-    response_body = response.read().decode('utf-8').replace('&shy;', '')
-    resolved_url = response.geturl()
-    response.close()
+def fetch_dbms_info_soup(url_init, header, **kwargs):
+    response_body, resolved_url = fetch_html(url_init, header, **fetch_options(kwargs))
+    response_body = response_body.replace('&shy;', '')
     re_email = re.compile(r'<span class="__cf_email__" data-cfemail="([0-9a-f]+)">\[email[^<>]+protected\]</span>')
     response_body = re.sub(re_email, lambda s: decode_email(s[1]), response_body, re.I)
     soup = BeautifulSoup(response_body, 'lxml')
@@ -307,6 +305,8 @@ def fetch_dbms_info_soup(url_init, header):
 def parse_legacy_dbms_info_soup(soup, use_elem_dict, preset_dict=None):
     # Parse the legacy card layout.
     main_contents = soup.find_all(use_elem_dict['main_contents'][0], attrs=use_elem_dict['main_contents'][1])
+    if not main_contents:
+        raise ValueError("No DBMS detail content found; the response may be an error page or the layout has changed.")
     db_info_table = main_contents[0]
 
     summary_col = db_info_table.find_all("div", {"class": "col-sm-12 col-md-7 order-2 order-md-1"})[0]
@@ -379,7 +379,7 @@ def parse_legacy_dbms_info_soup(soup, use_elem_dict, preset_dict=None):
 
 def crawling_dbms_info_soup(url_init, header, use_elem_dict, **kwargs):
     preset_dict = kwargs.get("preset_dict", {})
-    soup, _ = fetch_dbms_info_soup(url_init, header)
+    soup, _ = fetch_dbms_info_soup(url_init, header, **fetch_options(kwargs))
     dbms_info_record_attrs_dict = parse_modern_dbms_info_soup(soup, preset_dict=preset_dict)
     if dbms_info_record_attrs_dict:
         return dbms_info_record_attrs_dict
@@ -389,8 +389,13 @@ def crawling_dbms_info_soup(url_init, header, use_elem_dict, **kwargs):
 def inspect_dbms_info_soup(url_init, header, use_elem_dict=None, **kwargs):
     preset_dict = kwargs.get("preset_dict", {})
     try:
-        soup, resolved_url = fetch_dbms_info_soup(url_init, header)
-    except BaseException as e:
+        soup, resolved_url = fetch_dbms_info_soup(url_init, header, **fetch_options(kwargs))
+        dbms_info_record_attrs_dict = parse_modern_dbms_info_soup(soup, preset_dict=preset_dict)
+        if not dbms_info_record_attrs_dict and use_elem_dict:
+            dbms_info_record_attrs_dict = parse_legacy_dbms_info_soup(soup, use_elem_dict, preset_dict=preset_dict)
+        if not dbms_info_record_attrs_dict:
+            raise ValueError("No DBMS detail content found; the response may be an error page or the layout has changed.")
+    except Exception as e:
         return {
             "ok": False,
             "url": url_init,
@@ -398,10 +403,6 @@ def inspect_dbms_info_soup(url_init, header, use_elem_dict=None, **kwargs):
             "attrs": {},
             "error": f"{type(e).__name__}: {e}",
         }
-
-    dbms_info_record_attrs_dict = parse_modern_dbms_info_soup(soup, preset_dict=preset_dict)
-    if not dbms_info_record_attrs_dict and use_elem_dict:
-        dbms_info_record_attrs_dict = parse_legacy_dbms_info_soup(soup, use_elem_dict, preset_dict=preset_dict)
 
     return {
         "ok": True,
@@ -465,7 +466,7 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
             df1 = df1[use_cols]
         except FileNotFoundError:
             df1.to_csv(temp_save_path, encoding='utf-8', index=False)
-        except BaseException:
+        except Exception:
             pass
 
         len_df1 = len(df1)
@@ -483,9 +484,9 @@ def crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path
         header = headers[i % len(headers)]
         try:
             dbms_info_record_attrs_dict = crawling_dbms_info_soup(
-                url, header, use_elem_dict, preset_dict={KEY_ATTR_NAME: db_name_urn}
+                url, header, use_elem_dict, preset_dict={KEY_ATTR_NAME: db_name_urn}, **fetch_options(kwargs)
             )
-        except BaseException as e:
+        except Exception as e:
             error_msg = f"{type(e).__name__}: {e}"
             print(f"Warning: failed to crawl data for {db_name_card_title} on {url}: {error_msg}")
             dbms_info_record_attrs_dict = {

@@ -2,18 +2,48 @@
 Crawling Open Source DataBases from [dbdb.io](https://www.dbdb.io).
 
 # 1. Crawling OSDB list
-Crawling the Open Source DBMS list from [dbdb.io/browse?type=open-source](https://www.dbdb.io/browse?type=open-source) with the beautifulsoup package.
+Crawling the Open Source DBMS list from [dbdb.io/browse?project-type=open-source](https://dbdb.io/browse?project-type=open-source) with the beautifulsoup package.
 
 Save as [OSDB_crawling_202301_raw.csv](./data/dbdbio_OSDB_list/OSDB_crawling_202301_raw.csv)
 
 About dbdb.io http link:
-- Use "https://dbdb.io/browse?type=open-source" to get all the open source databases in dbdb.io
+- Use "https://dbdb.io/browse?project-type=open-source" to get all the open source databases in dbdb.io
 - Use "https://dbdb.io/browse?q=*" to get all the databases in dbdb.io
 
 This repository focus on the repositories which have image source codes and communities on github. 
 The commercial databases is not within the scope of crawling. 
 However, you can use "[dbdb.io/browse?q=*](https://www.dbdb.io/browse?q=*)" to crawl the entire data set if it is necessary.
 And the column "open_source_license" in "data/dbdbio_OSDB_list/OSDB_info_crawling_{month_yyyyMM}_raw.csv" may need to be re-labeled manually.
+
+## Slow responses and interrupted downloads
+
+The main crawler uses `urllib` and BeautifulSoup. `IncompleteRead` means the HTTP
+response ended before the transfer was complete; increasing a Selenium element
+wait does not fix this download error.
+
+`HTTP_OPTIONS` in `main.py` applies to the list, missing-record checks, and details:
+
+- `timeout=30`: each blocking socket operation times out after 30 seconds.
+- `max_attempts=3`: retry incomplete transfers, network errors, and temporary HTTP
+  errors (408, 429, 500, 502, 503, 504) up to three attempts in total.
+- `max_read_seconds=120`: check the response budget between reads. A pending read
+  can exceed this budget by up to `timeout` seconds. This is not a strict total
+  wall-clock deadline, and the whole crawl can take longer across many pages.
+- `retry_backoff=2`: wait 2 then 4 seconds between attempts.
+
+The console prints each URL and attempt before connecting, download progress
+during slow transfers, and completion or retry reasons. Partial responses are
+discarded and retried from the beginning. A list download or parsing failure
+raises an error before replacing the existing list CSV. Detail failures are
+recorded in `Crawl Error`, and the crawler continues with the next database.
+Ctrl+C interrupts the crawl normally. Existing batch checkpoint behavior is
+preserved; only completed batches have been saved if the crawl is interrupted.
+
+Run the local network regression tests without changing monthly data:
+
+```powershell
+.\venv\Scripts\python.exe -m unittest discover -s tests -v
+```
 
 # 2. recalc OSDB list
 The table of OSDB list csv have columns ["card_title", "card_title_href", "card_img_href", "card_text"]. 
@@ -50,6 +80,24 @@ use_cols_OSDB_info = ["Name", "card_title", "Description", "Data Model", "Query 
 # 6. Merging the current month manulabeled data with last month manulabeled data
 Find difference between current month manulabeled data(e.g. OSDB_info_202303_joined_manulabeled.csv) and last month manulabeled data(e.g. OSDB_info_202302_joined_manulabeled.csv). 
 Solve conflicts in the merged table(default overwrite the current month manulabeled data) manually.
+
+`AUTO_KEEP_CURRENT_MONTH_URLS = True` in `main.py` automatically keeps the current
+month's value for conflicts in `CURRENT_MONTH_URL_COLUMNS`: Website URL/Website,
+Documentation/Tech Docs, Wikipedia URL/Wikipedia, Blog URL, card_title_href, and
+card_img_href. The exact current value is preserved, including its trailing slash.
+When the current value is missing, the previous month's value is used as before.
+Other fields still show both months separated by
+`#start_checkpoint>|<last_month_manulabeled#` for manual review.
+
+Set the switch to `False` to restore manual conflict review for all columns, or
+edit the column list to choose which fields automatically keep the current month.
+Source Code and repository mapping fields retain manual conflict review by
+default. This policy applies when generating a merged table; changing the switch
+does not edit existing CSV files.
+
+`UPDATE_START_CHECKPOINT_USE_MANULABELED` only selects the current-month input:
+`0` reads the joined crawl output, while `1` reads the current annotated file.
+It does not control conflict resolution.
 
 ---
 ### 1. The reason for crawling OSDB information from dbdb.io

@@ -29,7 +29,15 @@ import numpy as np
 
 
 def merge_info_start_checkpoint_last_month_manulabeled(df1, df2, save_path, input_key_colname_pair, output_key_colname,
-                                                       use_columns_merged=None, conflict_delimiter="#df1>|<df2#", encoding="utf-8"):
+                                                       use_columns_merged=None, conflict_delimiter="#df1>|<df2#", encoding="utf-8",
+                                                       prefer_current_columns=None):
+    """Merge current-month df1 with last-month annotations in df2.
+
+    For prefer_current_columns, choose df1 when both values are present and
+    differ. Missing current values still fall back to df2. Other columns retain
+    the two values separated by conflict_delimiter for manual review.
+    """
+    prefer_current_columns = set(prefer_current_columns or ())
     df1 = pd.DataFrame(df1)
     df2 = pd.DataFrame(df2)
     columns1 = list(df1.columns.values)
@@ -122,7 +130,7 @@ def merge_info_start_checkpoint_last_month_manulabeled(df1, df2, save_path, inpu
                 except KeyError:
                     temp_item_df2 = np.nan
                 if pd.notna(temp_item_df1) and pd.notna(temp_item_df2):
-                    if temp_item_df1 == temp_item_df2:
+                    if temp_item_df1 == temp_item_df2 or c in prefer_current_columns:
                         v = temp_item_df1
                     else:
                         v = str(temp_item_df1) + conflict_delimiter + str(temp_item_df2)

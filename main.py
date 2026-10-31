@@ -36,7 +36,27 @@ RECALC_OSDB_LIST = True  # Add "Name" column
 RECALC_OSDB_INFO = True  # Check "Name" column; Representing "Data Model" "Source Code" "Start Year" "End Year" columns.
 JOIN_OSDB_SUMMARY_INFO_ON_NAME = True  # join OSDB summary and OSDB_infos on filed 'Name' and 'Name'
 
-month_YYYYmm = "202609"
+# URL conflicts use the current month; other fields keep both months for review.
+# False restores conflict markers for these URL columns as well.
+AUTO_KEEP_CURRENT_MONTH_URLS = True
+CURRENT_MONTH_URL_COLUMNS = (
+    "Website URL", "Website",
+    "Documentation", "Tech Docs",
+    "Wikipedia URL", "Wikipedia",
+    "Blog URL",
+    "card_title_href", "card_img_href",
+)
+
+# Shared by list downloads, missing-record checks and detail downloads.
+# timeout bounds each socket wait; max_read_seconds is checked between reads.
+HTTP_OPTIONS = {
+    "timeout": 30,
+    "max_attempts": 3,
+    "max_read_seconds": 120,
+    "retry_backoff": 2,
+}
+
+month_YYYYmm = "202610"
 
 
 def get_last_month_YYYYmm(curr_month_YYYYmm, interval=1):
@@ -90,12 +110,13 @@ if __name__ == '__main__':
         use_elem_dict = {
             'main_contents': ['form', {'id': 'mainsearch'}],
         }
-        crawling_OSDB_list_soup(url_init, headers[0], use_elem_dict, save_path=OSDB_crawling_path, url_root=dbdbio_url)
+        crawling_OSDB_list_soup(url_init, headers[0], use_elem_dict, save_path=OSDB_crawling_path,
+                                url_root=dbdbio_url, **HTTP_OPTIONS)
     if RECALC_OSDB_LIST:
         recalc_OSDB_list(path=OSDB_crawling_path)
     if UPDATE_OSDB_LIST:
         rescue_missing_open_source_records(OSDB_crawling_path, src_OSDB_crawling_last_month_path, headers,
-                                           sleep_seconds=1)
+                                           sleep_seconds=1, **HTTP_OPTIONS)
 
     if UPDATE_OSDB_INFO:
         df_OSDB_table = pd.read_csv(OSDB_crawling_path, encoding=encoding, index_col=False)
@@ -111,7 +132,7 @@ if __name__ == '__main__':
         temp_save_path = OSDB_info_crawling_path.rstrip('.csv') + '_temp.csv'
         state = -1
         crawling_OSDB_infos_soup(df_db_names_urls, headers, use_elem_dict, save_path=OSDB_info_crawling_path, mode=mode,
-                                 temp_save_path=temp_save_path, batch=batch)
+                                 temp_save_path=temp_save_path, batch=batch, **HTTP_OPTIONS)
 
         use_cols = ["Name", "card_title", "Description", "Data Model", "Query Interface", "System Architecture",
                     "Website URL", "Website", "Source Code", "Documentation", "Tech Docs", "Developer",
@@ -143,6 +164,7 @@ if __name__ == '__main__':
         df_src_OSDB_info_joined_last_month_manulabeled = pd.read_csv(src_OSDB_info_joined_last_month_manulabeled_path, encoding=encoding, index_col=False, dtype=default_dtype)
         merge_info_start_checkpoint_last_month_manulabeled(df_update_start_checkpoint, df_src_OSDB_info_joined_last_month_manulabeled,
                                                            save_path=OSDB_info_joined_manulabeled_path, input_key_colname_pair=["DBMS_urnform", "DBMS_urnform"],
-                                                           output_key_colname="DBMS_urnform", conflict_delimiter="#start_checkpoint>|<last_month_manulabeled#", encoding=encoding)
+                                                           output_key_colname="DBMS_urnform", conflict_delimiter="#start_checkpoint>|<last_month_manulabeled#", encoding=encoding,
+                                                           prefer_current_columns=CURRENT_MONTH_URL_COLUMNS if AUTO_KEEP_CURRENT_MONTH_URLS else None)
 
     # Solve conflicts in the merged table(default overwrite the current month manulabeled data e.g. OSDB_info_202303_joined_manulabeled.csv) manually.
